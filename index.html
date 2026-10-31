@@ -72,11 +72,23 @@ button:disabled{opacity:.55;cursor:default}
 .empty{color:var(--muted);text-align:center;padding:28px 10px;font-size:14px}
 .setup{background:var(--warn-bg);color:var(--warn);border-radius:12px;padding:12px;font-size:13px}
 .setup b{color:var(--ink)}
+.sheet-bg{position:fixed;inset:0;background:rgba(17,22,25,.45);display:flex;align-items:flex-end;justify-content:center;z-index:20}
+.sheet{background:var(--surface);color:var(--ink);width:100%;max-width:640px;border-radius:20px 20px 0 0;padding:18px max(16px,env(safe-area-inset-right,0px)) calc(18px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:12px;max-height:80vh;overflow-y:auto;box-sizing:border-box}
+.sheet h3{font-family:var(--f-display);font-size:28px;line-height:1}
+.folders{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.fbtn{width:100%;justify-content:space-between;text-align:right;min-height:52px;white-space:normal}
+.card-btn{padding:14px 16px;border-radius:14px}
+.newf{display:flex;flex-direction:column;gap:6px}
+.newf label{font-size:12px;font-weight:600;color:var(--muted)}
+.daysbar{justify-content:space-between;margin-bottom:10px}
+.sec{font-family:var(--f-display);font-size:24px;line-height:1;margin:14px 0 8px}
+.primary-link{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+#panel .day+.day{margin-top:10px}
 </style>
 </head>
 <body>
 <main class="app">
-  <header class="brand"><h1>מהפיד <span>למפה</span></h1><span class="count" id="ver">v0.2</span></header>
+  <header class="brand"><h1>מהפיד <span>למפה</span></h1><span class="count" id="ver">v0.3</span></header>
 
   <form class="scan" id="form">
     <input id="url" type="url" inputmode="url" placeholder="הדבק קישור מטיקטוק או אינסטגרם" aria-label="קישור לסרטון" required>
@@ -104,6 +116,7 @@ button:disabled{opacity:.55;cursor:default}
   <nav class="tabs" role="tablist" id="tabs" hidden></nav>
   <section id="panel"></section>
 </main>
+<div id="sheet" class="sheet-bg" hidden></div>
 
 <script>
 /* ---- config: the server that reads the video ---- */
@@ -114,7 +127,6 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const store = { get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch{return d}}, set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}} };
 
-let state = { res: store.get("ftm_last", null), tab: "list", sel: null, trip: store.get("ftm_trip", []) };
 
 /* ---- Google map (embed, no key needed) ---- */
 // Google resolves place names to the real business; raw coordinates show street addresses instead.
@@ -164,7 +176,7 @@ async function scan(raw){
       return;
     }
     if (!j.places?.length) { setStatus("קראתי את הסרטון אבל לא מצאתי בו שמות של מקומות.", true); return; }
-    state.res = j; state.sel = null; state.tab = "list";
+    state.res = j; state.sel = null; state.tab = "list"; state.folder = null; delete state.days.v;
     store.set("ftm_last", j);
     setStatus(`נמצאו ${j.places.length} מקומות.`);
     render();
@@ -176,72 +188,187 @@ $("#form").addEventListener("submit", e => { e.preventDefault(); scan($("#url").
 $("#pinForm").addEventListener("submit", e => { e.preventDefault(); store.set("ftm_pin", $("#pin").value.trim()); $("#pinForm").hidden = true; $("#pin").value = ""; if (state.pendingUrl) scan(state.pendingUrl); });
 $("#paste").onclick = async () => { try { const t = await navigator.clipboard.readText(); $("#url").value = extractUrl(t) || t; if (extractUrl(t)) scan(t); } catch { $("#url").focus(); setStatus("הדבק את הקישור בשדה (לחיצה ארוכה ← הדבק)."); } };
 
-/* ---- trip list ---- */
-const key = p => (p.name + "|" + (p.city||"")).toLowerCase();
-const inTrip = p => state.trip.some(t => key(t) === key(p));
-function toggleTrip(p){
-  state.trip = inTrip(p) ? state.trip.filter(t => key(t) !== key(p)) : [...state.trip, p];
-  store.set("ftm_trip", state.trip); render();
+/* ---- saved places live in folders, one per country by default ---- */
+function loadFolders(){
+  let f = store.get("ftm_folders", null);
+  if (!f) {
+    const old = store.get("ftm_trip", []);
+    f = old.length ? [{ id: "f" + Date.now(), name: "הטיול שלי", places: old }] : [];
+    store.set("ftm_folders", f);
+  }
+  return f;
+}
+let state = { res: store.get("ftm_last", null), tab: "list", sel: null, folders: loadFolders(), folder: null, days: {}, pick: null };
+const saveFolders = () => store.set("ftm_folders", state.folders);
+
+const COUNTRY_HE = { Japan:"יפן", "Czech Republic":"צ׳כיה", Czechia:"צ׳כיה", Portugal:"פורטוגל", Italy:"איטליה", France:"צרפת", Spain:"ספרד", Greece:"יוון", Thailand:"תאילנד", "United Kingdom":"אנגליה", UK:"אנגליה", England:"אנגליה", Germany:"גרמניה", Netherlands:"הולנד", Hungary:"הונגריה", Austria:"אוסטריה", "United States":"ארה״ב", USA:"ארה״ב", Israel:"ישראל", "United Arab Emirates":"איחוד האמירויות", UAE:"איחוד האמירויות", Turkey:"טורקיה", Türkiye:"טורקיה", "South Korea":"קוריאה", Georgia:"גאורגיה", Cyprus:"קפריסין", Poland:"פולין", Romania:"רומניה", Croatia:"קרואטיה", Montenegro:"מונטנגרו", Vietnam:"וייטנאם", India:"הודו", Mexico:"מקסיקו" };
+const CITY_COUNTRY = { Tokyo:"יפן", Kyoto:"יפן", Osaka:"יפן", Prague:"צ׳כיה", Lisbon:"פורטוגל", Porto:"פורטוגל", Paris:"צרפת", Rome:"איטליה", Milan:"איטליה", Florence:"איטליה", Naples:"איטליה", London:"אנגליה", Berlin:"גרמניה", Amsterdam:"הולנד", Barcelona:"ספרד", Madrid:"ספרד", Athens:"יוון", Bangkok:"תאילנד", Dubai:"איחוד האמירויות", Budapest:"הונגריה", "New York":"ארה״ב", "Tel Aviv":"ישראל", Jerusalem:"ישראל", Vienna:"אוסטריה", Seoul:"קוריאה", Istanbul:"טורקיה" };
+const suggestFolder = r => COUNTRY_HE[r?.country] || CITY_COUNTRY[r?.city] || r?.country || r?.city || "";
+
+const key = p => (p.name + "|" + (p.city || "")).toLowerCase();
+const folderOf = p => state.folders.find(f => f.places.some(t => key(t) === key(p)));
+const withCity = p => ({ ...p, city: p.city || state.res?.city || "", source: p.source || state.res?.source?.url || "" });
+
+function openPicker(places){
+  state.pick = places.map(withCity);
+  renderSheet();
+}
+function addToFolder(id){
+  const f = state.folders.find(x => x.id === id);
+  if (!f || !state.pick) return;
+  let added = 0;
+  state.pick.forEach(p => { if (!f.places.some(t => key(t) === key(p))) { f.places.push(p); added++; } });
+  saveFolders();
+  setStatus(added ? `נשמרו ${added} מקומות בתיקייה "${f.name}".` : `המקומות כבר נמצאים בתיקייה "${f.name}".`);
+  state.pick = null; renderSheet(); render();
+}
+function renderSheet(){
+  const el = $("#sheet");
+  if (!state.pick) { el.hidden = true; el.innerHTML = ""; return; }
+  const sug = suggestFolder(state.res);
+  const match = state.folders.find(f => f.name === sug);
+  el.hidden = false;
+  el.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetT">
+    <h3 id="sheetT">לאיזו תיקייה לשמור?</h3>
+    <p class="sub" style="margin:0">${state.pick.length === 1 ? esc(state.pick[0].name) : state.pick.length + " מקומות"}</p>
+    ${state.folders.length ? `<ul class="folders">${state.folders.map(f => `<li><button class="fbtn" data-pick="${f.id}"><span><b>${esc(f.name)}</b> <span class="sub">${f.places.length} מקומות</span></span>${f === match ? `<span class="chip">מתאים לסרטון</span>` : ""}</button></li>`).join("")}</ul>` : ""}
+    <form id="newFolder" class="newf">
+      <label for="nf">${state.folders.length ? "או תיקייה חדשה" : "שם התיקייה"}</label>
+      <div class="scan"><input id="nf" value="${esc(match ? "" : sug)}" placeholder="למשל: יפן" style="direction:rtl;text-align:right;font-family:var(--f-body)" required>
+      <button class="primary" type="submit">צור ושמור</button></div>
+    </form>
+    <button class="small" id="sheetClose" type="button" style="align-self:flex-start">ביטול</button>
+  </div>`;
+  $("#newFolder").addEventListener("submit", e => {
+    e.preventDefault();
+    const name = $("#nf").value.trim(); if (!name) return;
+    let f = state.folders.find(x => x.name === name);
+    if (!f) { f = { id: "f" + Date.now().toString(36), name, places: [] }; state.folders.push(f); }
+    addToFolder(f.id);
+  });
+}
+
+/* ---- route: from the video when it has one, otherwise split the places into days ---- */
+const SLOTS = ["בוקר", "צהריים", "אחה״צ", "ערב", "ערב", "לילה"];
+function autoDays(places, nDays){
+  const per = Math.ceil(places.length / nDays);
+  const days = [];
+  for (let d = 0; d < nDays; d++) {
+    const chunk = places.slice(d * per, d * per + per);
+    if (chunk.length) days.push({ day: d + 1, title: "", stops: chunk.map((p, j) => ({ p, slot: SLOTS[Math.min(j, SLOTS.length - 1)] })) });
+  }
+  return days;
+}
+function routeHTML(ctx, places, itinerary, city){
+  if (!places.length) return `<div class="empty">אין מקומות לבנות מהם מסלול.</div>`;
+  let days, auto = false;
+  const n = state.days[ctx];
+  if (itinerary?.length && n == null) {
+    const byId = Object.fromEntries(places.map(p => [p.id, p]));
+    days = itinerary.map(d => ({ day: d.day, title: d.title, stops: (d.stops || []).map(s => ({ p: byId[s.id], slot: s.slot })).filter(s => s.p) }));
+  } else {
+    auto = true;
+    days = autoDays(places, Math.max(1, Math.min(places.length, n ?? Math.ceil(places.length / 4))));
+  }
+  const count = days.length;
+  return `<div class="row daysbar"><span class="sub">${auto ? "מסלול לפי סדר המקומות" : "מסלול לפי אזורים"}</span>
+      <span class="row"><button class="small" data-days="${ctx}|-1" aria-label="פחות ימים">−</button><span class="count" style="font-size:14px">${count} ימים</span><button class="small" data-days="${ctx}|1" aria-label="יותר ימים">+</button></span></div>
+    ${days.map(d => `<div class="day"><div class="row" style="justify-content:space-between"><h3>יום ${esc(d.day)}${d.title ? " · " + esc(d.title) : ""}</h3>
+      <a class="btn small primary-link" target="_blank" rel="noopener" href="${openRoute(d.stops.map(s => s.p), city)}">ניווט ביום הזה</a></div>
+      <ol class="stops">${d.stops.map(s => `<li><span class="t">${esc(s.slot || "")}</span><span><b>${places.indexOf(s.p) + 1}. ${esc(s.p.name)}</b></span></li>`).join("")}</ol></div>`).join("")}
+    <p class="sub">"ניווט ביום הזה" פותח את מפות Google עם כל התחנות של היום, לפי הסדר.</p>`;
 }
 
 /* ---- render ---- */
-function placeHTML(p, i, city){
-  const q = {...p, city: p.city || city};
+function placeHTML(p, i, city, inFolder){
+  const f = inFolder ? null : folderOf(withCity(p));
   return `<li class="place ${state.sel===i?"sel":""}" data-i="${i}">
     <div class="num">${i+1}</div><div class="body">
       <h3>${esc(p.name)}</h3>${p.local && p.local!==p.name?`<div class="local">${esc(p.local)}</div>`:""}
-      <div class="meta">${p.category?`<span class="chip">${esc(p.category)}</span>`:""}${p.neighborhood?`<span>${esc(p.neighborhood)}</span>`:""}${p.price?`<span>${esc(p.price)}</span>`:""}${!(p.lat)?`<span class="chip warn">מיקום לא אומת</span>`:""}</div>
+      <div class="meta">${p.category?`<span class="chip">${esc(p.category)}</span>`:""}${inFolder && p.city?`<span>${esc(p.city)}</span>`:""}${p.neighborhood?`<span>${esc(p.neighborhood)}</span>`:""}${p.price?`<span>${esc(p.price)}</span>`:""}${!(p.lat)?`<span class="chip warn">מיקום לא אומת</span>`:""}</div>
       ${p.why?`<p>${esc(p.why)}</p>`:""}${p.dish?`<div class="sub">להזמין: ${esc(p.dish)}</div>`:""}
       ${p.rating?`<div class="score">★ ${(+p.rating).toFixed(1)} <small>גוגל · ${p.ratingCount||0} ביקורות</small></div>`:""}
       ${p.address?`<div class="sub">${esc(p.address.split(",").slice(0,3).join(","))}</div>`:""}
       <div class="row"><a class="btn small" href="${openOne(p, city)}" target="_blank" rel="noopener" data-stop>גוגל מפות</a>
-        <button class="small" data-trip="${i}" data-stop>${inTrip(q)?"✓ בטיול":"+ לטיול"}</button></div>
+        ${inFolder ? `<button class="small" data-remove="${i}" data-stop>הסר מהתיקייה</button>` : `<button class="small" data-save="${i}" data-stop>${f ? "✓ ב" + esc(f.name) : "+ שמור לתיקייה"}</button>`}</div>
     </div></li>`;
 }
 
 function render(){
   const r = state.res;
-  if (!r) { $("#card").hidden = true; $("#tabs").hidden = true; $("#panel").innerHTML = `<div class="empty">הדבק קישור לסרטון על אוכל או טיול, ותקבל את המקומות על מפת גוגל.</div>`; return; }
-  const onTrip = state.tab === "trip";
-  const places = onTrip ? state.trip : r.places;
-  const city = onTrip ? "" : (r.city || "");
-  $("#card").hidden = false; $("#tabs").hidden = false;
-  $("#title").textContent = onTrip ? "הטיול שלי" : cleanTitle(r.title);
-  $("#meta").innerHTML = onTrip ? `<span>${state.trip.length} מקומות מכל הסרטונים</span>` :
-    `${r.source?.author?`<span>${esc(r.source.author)}</span><span>·</span>`:""}<span>${esc([r.city,r.country].filter(Boolean).join(", "))}</span>${r.mode==="simple"?`<span class="chip warn">חילוץ בסיסי</span>`:""}${r.source?.url?`<a class="sub" href="${esc(r.source.url)}" target="_blank" rel="noopener">לסרטון</a>`:""}`;
+  const onFolders = state.tab === "folders";
+  const folder = onFolders ? state.folders.find(f => f.id === state.folder) : null;
+  if (!r && !onFolders) {
+    $("#card").hidden = true; $("#tabs").hidden = !state.folders.length;
+    renderTabs(r);
+    $("#panel").innerHTML = `<div class="empty">הדבק קישור לסרטון על אוכל או טיול, ותקבל את המקומות על מפת גוגל.</div>`;
+    return;
+  }
+  $("#tabs").hidden = false;
+  renderTabs(r);
+
+  if (onFolders && !folder) {
+    $("#card").hidden = true;
+    $("#panel").innerHTML = state.folders.length
+      ? `<ul class="list">${state.folders.map(f => `<li><button class="fbtn card-btn" data-folder="${f.id}"><span><b style="font-size:17px">${esc(f.name)}</b><br><span class="sub">${f.places.length} מקומות · ${new Set(f.places.map(p => p.source).filter(Boolean)).size || 1} סרטונים</span></span><span aria-hidden="true">‹</span></button></li>`).join("")}</ul>`
+      : `<div class="empty">עוד אין תיקיות. בכל סרטון לחץ "+ שמור לתיקייה", ותבחר או תיצור תיקייה, למשל לפי מדינה.</div>`;
+    return;
+  }
+
+  const places = folder ? folder.places : r.places;
+  const city = folder ? (places[0]?.city || "") : (r.city || "");
+  const mode = folder ? (places.every(p => p.lat) ? "full" : "simple") : r.mode;
+  $("#card").hidden = false;
+  $("#title").textContent = folder ? folder.name : cleanTitle(r.title);
+  $("#meta").innerHTML = folder
+    ? `<button class="small" id="backFolders" type="button">› כל התיקיות</button><span>${places.length} מקומות</span>`
+    : `${r.source?.author?`<span>${esc(r.source.author)}</span><span>·</span>`:""}<span>${esc([r.city,r.country].filter(Boolean).join(", "))}</span>${r.mode==="simple"?`<span class="chip warn">חילוץ בסיסי</span>`:""}${r.source?.url?`<a class="sub" href="${esc(r.source.url)}" target="_blank" rel="noopener">לסרטון</a>`:""}`;
 
   const sel = state.sel != null ? places[state.sel] : null;
-  const src = sel ? embedOne(sel, sel.city || city) : embedAll(places, city, onTrip ? "" : r.mode);
+  const src = sel ? embedOne(sel, sel.city || city) : embedAll(places, city, mode);
   if ($("#gmap").dataset.src !== src) { $("#gmap").src = src; $("#gmap").dataset.src = src; }
-  $("#mapLabel").textContent = sel ? `${state.sel+1}. ${sel.name}` : (!onTrip && r.mode === "simple" ? "לחץ על מקום ברשימה כדי לראות אותו במפה" : (places.length > 1 ? "כל המקומות, לפי סדר המסלול" : ""));
+  $("#mapLabel").textContent = sel ? `${state.sel+1}. ${sel.name}` : (mode === "simple" ? "לחץ על מקום ברשימה כדי לראות אותו במפה" : (places.length > 1 ? "כל המקומות, לפי סדר המסלול" : ""));
   $("#showAll").hidden = !sel;
   $("#openG").href = sel ? openOne(sel, sel.city || city) : openRoute(places, city);
 
-  const tabs = [["list","רשימה",r.places.length],["route","מסלול",r.itinerary?.length||0],["trip","הטיול שלי",state.trip.length]];
-  $("#tabs").innerHTML = tabs.map(([k,l,c]) => `<button role="tab" aria-selected="${state.tab===k}" data-tab="${k}">${l} <span class="count">${c}</span></button>`).join("");
-
   let html = "";
-  if (state.tab === "list" || onTrip) {
-    html = places.length ? `<div class="row" style="margin-bottom:10px">${onTrip?"":`<button class="small" id="addAll">+ הוסף הכל לטיול</button>`}</div><ul class="list">${places.map((p,i)=>placeHTML(p,i,p.city||city)).join("")}</ul>`
-      : `<div class="empty">עוד לא שמרת מקומות. לחץ "+ לטיול" ליד מקום, והרשימה תצטבר כאן מכל הסרטונים.</div>`;
+  if (folder) {
+    html = places.length
+      ? `<h3 class="sec">מסלול</h3>${routeHTML("f:" + folder.id, places, null, city)}<h3 class="sec">המקומות בתיקייה</h3><ul class="list">${places.map((p,i)=>placeHTML(p,i,p.city,true)).join("")}</ul>`
+      : `<div class="empty">התיקייה ריקה.</div>`;
+  } else if (state.tab === "list") {
+    html = `<div class="row" style="margin-bottom:10px"><button class="small" id="addAll">+ שמור הכל לתיקייה</button></div><ul class="list">${places.map((p,i)=>placeHTML(p,i,city,false)).join("")}</ul>`;
   } else {
-    const byId = Object.fromEntries(r.places.map((p,i)=>[p.id,{p,i}]));
-    html = (r.itinerary||[]).length ? (r.itinerary).map(d => {
-      const st = (d.stops||[]).map(s=>({...s,o:byId[s.id]})).filter(s=>s.o);
-      return `<div class="day"><div class="row" style="justify-content:space-between"><h3>יום ${esc(d.day)} · ${esc(d.title||"")}</h3><a class="btn small" target="_blank" rel="noopener" href="${openRoute(st.map(s=>s.o.p), city)}">ניווט ביום הזה</a></div>
-        <ol class="stops">${st.map(s=>`<li><span class="t">${esc(s.slot||"")}</span><span><b>${s.o.i+1}. ${esc(s.o.p.name)}</b></span></li>`).join("")}</ol></div>`;
-    }).join("") : `<div class="empty">אין מסלול לסרטון הזה. המסלול נבנה אוטומטית כשהחילוץ החכם פעיל.</div>`;
+    html = routeHTML("v", places, r.itinerary, city);
   }
   $("#panel").innerHTML = html;
 }
+function renderTabs(r){
+  const routeDays = r ? (state.days.v != null ? Math.min(r.places.length, state.days.v) : (r.itinerary?.length || Math.ceil(r.places.length / 4))) : 0;
+  const tabs = [["list","רשימה",r?.places.length||0],["route","מסלול",routeDays],["folders","התיקיות שלי",state.folders.length]].filter(([k]) => r || k === "folders");
+  $("#tabs").innerHTML = tabs.map(([k,l,c]) => `<button role="tab" aria-selected="${state.tab===k}" data-tab="${k}">${l} <span class="count">${c}</span></button>`).join("");
+}
 
 document.addEventListener("click", e => {
-  const t = e.target.closest("[data-tab],[data-trip],.place,#addAll,#showAll");
+  const t = e.target.closest("[data-tab],[data-save],[data-remove],[data-folder],[data-pick],[data-days],.place,#addAll,#showAll,#backFolders,#sheetClose,#sheet");
   if (!t) return;
-  if (t.matches("[data-tab]")) { state.tab = t.dataset.tab; state.sel = null; render(); return; }
+  if (t.id === "sheet") { if (e.target === t) { state.pick = null; renderSheet(); } return; }
+  if (t.id === "sheetClose") { state.pick = null; renderSheet(); return; }
+  if (t.matches("[data-pick]")) { addToFolder(t.dataset.pick); return; }
+  if (t.matches("[data-tab]")) { state.tab = t.dataset.tab; state.sel = null; if (state.tab !== "folders") state.folder = null; render(); return; }
+  if (t.matches("[data-folder]")) { state.folder = t.dataset.folder; state.sel = null; render(); return; }
+  if (t.id === "backFolders") { state.folder = null; state.sel = null; render(); return; }
   if (t.id === "showAll") { state.sel = null; render(); return; }
-  if (t.id === "addAll") { state.res.places.forEach(p => { const q={...p, city:p.city||state.res.city}; if(!inTrip(q)) state.trip.push(q); }); store.set("ftm_trip", state.trip); render(); return; }
-  if (t.matches("[data-trip]")) { const list = state.tab==="trip" ? state.trip : state.res.places; const p = list[+t.dataset.trip]; toggleTrip(state.tab==="trip" ? p : {...p, city:p.city||state.res.city}); return; }
+  if (t.id === "addAll") { openPicker(state.res.places); return; }
+  if (t.matches("[data-save]")) { openPicker([state.res.places[+t.dataset.save]]); return; }
+  if (t.matches("[data-remove]")) { const f = state.folders.find(x => x.id === state.folder); f.places.splice(+t.dataset.remove, 1); saveFolders(); state.sel = null; render(); return; }
+  if (t.matches("[data-days]")) {
+    const [ctx, step] = t.dataset.days.split("|");
+    const list = ctx === "v" ? state.res.places : (state.folders.find(f => "f:" + f.id === ctx)?.places || []);
+    const cur = state.days[ctx] ?? (ctx === "v" && state.res.itinerary?.length ? state.res.itinerary.length : Math.ceil(list.length / 4));
+    state.days[ctx] = Math.max(1, Math.min(list.length, cur + +step));
+    render(); return;
+  }
   if (t.matches(".place") && !e.target.closest("[data-stop]")) { const i = +t.dataset.i; state.sel = state.sel === i ? null : i; render(); $(".map").scrollIntoView({behavior:"smooth", block:"nearest"}); }
 });
 
