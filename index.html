@@ -98,13 +98,18 @@ button:disabled{opacity:.55;cursor:default}
 .save-all{background:var(--pin);border-color:var(--pin);color:var(--pin-ink);min-height:44px;font-weight:600}
 .chip.ok{background:var(--soft);color:var(--route);font-weight:600;align-self:center}
 .ghost{background:transparent;color:var(--muted)}
+.share{margin:0 0 12px}
+.wa{background:#1F8A4C;border-color:#1F8A4C;color:#fff;font-weight:600}
+.area{color:var(--route)}
+.area-chip{background:transparent;border:1px solid var(--route);color:var(--route)}
+.day.rest{background:transparent;border-style:dashed}
 .reset{margin-top:28px;display:flex;flex-direction:column;align-items:flex-start;gap:10px}
 .danger{background:var(--pin);color:var(--pin-ink);border-color:var(--pin)}
 </style>
 </head>
 <body>
 <main class="app">
-  <header class="brand"><h1>מהפיד <span>למפה</span></h1><span class="count" id="ver">v0.6.1</span></header>
+  <header class="brand"><h1>מהפיד <span>למפה</span></h1><span class="count" id="ver">v0.7</span></header>
 
   <form class="scan" id="form">
     <input id="url" type="url" inputmode="url" placeholder="הדבק קישור מטיקטוק או אינסטגרם" aria-label="קישור לסרטון" required>
@@ -189,7 +194,7 @@ async function scan(raw){
   if (!url) { setStatus("לא מצאתי קישור. הדבק קישור שמתחיל ב־https://", true); return; }
   $("#url").value = url;
   $("#go").disabled = true; $("#bar").hidden = false; $("#setup").innerHTML = "";
-  setStatus("קורא את הסרטון ומאתר את המקומות… (10–40 שניות)");
+  setStatus("קורא את הסרטון ומאתר את המקומות והאזורים… (עד 20 שניות)");
   try {
     const r = await fetch(API, { method:"POST", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${ANON}`, apikey: ANON }, body: JSON.stringify({ url, pin: store.get("ftm_pin", "") }) });
     const j = await r.json().catch(() => ({}));
@@ -300,32 +305,93 @@ function renderSheet(){
 
 /* ---- route: from the video when it has one, otherwise split the places into days ---- */
 const SLOTS = ["בוקר", "צהריים", "אחה״צ", "ערב", "ערב", "לילה"];
-function autoDays(places, nDays){
-  const per = Math.ceil(places.length / nDays);
-  const days = [];
-  for (let d = 0; d < nDays; d++) {
-    const chunk = places.slice(d * per, d * per + per);
-    if (chunk.length) days.push({ day: d + 1, title: "", stops: chunk.map((p, j) => ({ p, slot: SLOTS[Math.min(j, SLOTS.length - 1)] })) });
+/* ---- route by area: places with a location are grouped so each day stays in one area ---- */
+const dist = (a, b) => { const k = Math.cos((a.lat + b.lat) / 2 * Math.PI / 180); return Math.hypot(a.lat - b.lat, (a.lng - b.lng) * k); };
+function kmeans(pts, k){
+  // farthest-point start, then a few rounds of k-means
+  let cent = [pts[0]];
+  while (cent.length < k) cent.push(pts.reduce((best, p) => Math.min(...cent.map(c => dist(p, c))) > Math.min(...cent.map(c => dist(best, c))) ? p : best, pts[0]));
+  cent = cent.map(c => ({ lat: c.lat, lng: c.lng }));
+  let group = [];
+  for (let it = 0; it < 12; it++) {
+    group = pts.map(p => cent.reduce((bi, c, i) => dist(p, c) < dist(p, cent[bi]) ? i : bi, 0));
+    cent = cent.map((c, i) => { const m = pts.filter((_, j) => group[j] === i); return m.length ? { lat: m.reduce((s, p) => s + p.lat, 0) / m.length, lng: m.reduce((s, p) => s + p.lng, 0) / m.length } : c; });
   }
-  return days;
+  return cent.map((_, i) => pts.filter((_, j) => group[j] === i)).filter(g => g.length);
 }
-function routeHTML(ctx, places, itinerary, city){
-  if (!places.length) return `<div class="empty">אין מקומות לבנות מהם מסלול.</div>`;
-  let days, auto = false;
+function walkOrder(g){
+  // start at the most western place and always walk to the nearest one left
+  const left = [...g].sort((a, b) => a.lng - b.lng), out = [left.shift()];
+  while (left.length) { const last = out[out.length - 1]; left.sort((a, b) => dist(last, a) - dist(last, b)); out.push(left.shift()); }
+  return out;
+}
+const areaOf = p => p.area || (p.neighborhood && /[A-Za-zÀ-ÿ]/.test(p.neighborhood) ? p.neighborhood : "") || "";
+function areaTitle(g){
+  const c = {}; g.forEach(p => { const a = areaOf(p); if (a) c[a] = (c[a] || 0) + 1; });
+  return Object.entries(c).sort((x, y) => y[1] - x[1]).slice(0, 2).map(([a]) => a).join(" · ");
+}
+function defaultDays(places){
+  const located = places.filter(p => p.lat);
+  if (located.length < 2) return Math.max(1, Math.ceil(places.length / 4));
+  const areas = new Set(located.map(areaOf).filter(Boolean)).size || 1;
+  return Math.max(1, Math.min(areas, Math.ceil(located.length / 2)));
+}
+function planDays(places, nDays){
+  const located = places.filter(p => p.lat && p.lng);
+  const rest = places.filter(p => !(p.lat && p.lng));
+  if (located.length >= 2) {
+    const k = Math.max(1, Math.min(nDays, located.length));
+    const groups = kmeans(located, k).map(walkOrder).sort((a, b) => b.length - a.length);
+    return { byArea: true, rest, days: groups.map((g, d) => ({ day: d + 1, title: areaTitle(g), stops: g.map((p, j) => ({ p, slot: SLOTS[Math.min(j, SLOTS.length - 1)] })) })) };
+  }
+  const per = Math.ceil(places.length / nDays), days = [];
+  for (let d = 0; d < nDays; d++) { const chunk = places.slice(d * per, d * per + per); if (chunk.length) days.push({ day: d + 1, title: "", stops: chunk.map((p, j) => ({ p, slot: SLOTS[Math.min(j, SLOTS.length - 1)] })) }); }
+  return { byArea: false, rest: [], days };
+}
+function currentDays(ctx, places, itinerary){
   const n = state.days[ctx];
   if (itinerary?.length && n == null) {
     const byId = Object.fromEntries(places.map(p => [p.id, p]));
-    days = itinerary.map(d => ({ day: d.day, title: d.title, stops: (d.stops || []).map(s => ({ p: byId[s.id], slot: s.slot })).filter(s => s.p) }));
-  } else {
-    auto = true;
-    days = autoDays(places, Math.max(1, Math.min(places.length, n ?? Math.ceil(places.length / 4))));
+    return { byArea: true, rest: [], days: itinerary.map(d => ({ day: d.day, title: d.title, stops: (d.stops || []).map(s => ({ p: byId[s.id], slot: s.slot })).filter(s => s.p) })).filter(d => d.stops.length) };
   }
-  const count = days.length;
-  return `<div class="row daysbar"><span class="sub">${auto ? "מסלול לפי סדר המקומות" : "מסלול לפי אזורים"}</span>
+  return planDays(places, Math.max(1, Math.min(places.length, n ?? defaultDays(places))));
+}
+
+/* ---- sharing on WhatsApp ---- */
+const mapsLink = (p, city) => p.mapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(label(p, p.city || city))}`;
+function shareText(kind, title, places, city, plan){
+  const lines = [`🗺️ ${title}`, ""];
+  if (kind === "route") {
+    plan.days.forEach(d => {
+      lines.push(`*יום ${d.day}${d.title ? " · " + d.title : ""}*`);
+      d.stops.forEach(s => lines.push(`${places.indexOf(s.p) + 1}. ${s.p.name}${s.slot ? " (" + s.slot + ")" : ""}`));
+      lines.push(`ניווט ביום הזה: ${openRoute(d.stops.map(s => s.p), city)}`, "");
+    });
+    if (plan.rest.length) { lines.push("*עוד מקומות (בלי מיקום מאומת)*"); plan.rest.forEach(p => lines.push(`• ${p.name}: ${mapsLink(p, city)}`)); lines.push(""); }
+  } else {
+    places.forEach((p, i) => lines.push(`${i + 1}. ${p.name}${areaOf(p) ? " · " + areaOf(p) : ""}${p.why ? "\n   " + p.why : ""}\n   ${mapsLink(p, city)}`));
+    lines.push("");
+  }
+  lines.push("נשלח מ״מהפיד למפה״");
+  return lines.join("\n");
+}
+const waLink = text => `https://wa.me/?text=${encodeURIComponent(text)}`;
+function shareRow(text){
+  return `<div class="row share"><a class="btn small wa" href="${waLink(text)}" target="_blank" rel="noopener">שתף בוואטסאפ</a>${navigator.share ? `<button class="small" type="button" data-share="${esc(encodeURIComponent(text))}">שתף…</button>` : ""}</div>`;
+}
+
+function routeHTML(ctx, places, itinerary, city, title){
+  if (!places.length) return `<div class="empty">אין מקומות לבנות מהם מסלול.</div>`;
+  const plan = currentDays(ctx, places, itinerary);
+  const count = plan.days.length;
+  return `<div class="row daysbar"><span class="sub">${plan.byArea ? "כל יום באזור אחד" : "אין מספיק מיקומים לחלוקה לפי אזורים, המסלול לפי סדר המקומות"}</span>
       <span class="row"><button class="small" data-days="${ctx}|-1" aria-label="פחות ימים">−</button><span class="count" style="font-size:14px">${count} ימים</span><button class="small" data-days="${ctx}|1" aria-label="יותר ימים">+</button></span></div>
-    ${days.map(d => `<div class="day"><div class="row" style="justify-content:space-between"><h3>יום ${esc(d.day)}${d.title ? " · " + esc(d.title) : ""}</h3>
+    ${shareRow(shareText("route", title, places, city, plan))}
+    ${plan.days.map(d => `<div class="day"><div class="row" style="justify-content:space-between"><h3>יום ${esc(d.day)}${d.title ? ` · <span class="area">${esc(d.title)}</span>` : ""}</h3>
       <a class="btn small primary-link" target="_blank" rel="noopener" href="${openRoute(d.stops.map(s => s.p), city)}">ניווט ביום הזה</a></div>
-      <ol class="stops">${d.stops.map(s => `<li><span class="t">${esc(s.slot || "")}</span><span><b>${places.indexOf(s.p) + 1}. ${esc(s.p.name)}</b></span></li>`).join("")}</ol></div>`).join("")}
+      <ol class="stops">${d.stops.map(s => `<li><span class="t">${esc(s.slot || "")}</span><span><b>${places.indexOf(s.p) + 1}. ${esc(s.p.name)}</b>${areaOf(s.p) && areaOf(s.p) !== d.title ? ` <span class="sub">${esc(areaOf(s.p))}</span>` : ""}</span></li>`).join("")}</ol></div>`).join("")}
+    ${plan.rest.length ? `<div class="day rest"><h3>עוד מקומות</h3><p class="sub" style="margin:0">לא מצאתי להם מיקום מדויק, ולכן לא שובצו ביום. לחץ עליהם ברשימה כדי לראות אותם במפה.</p>
+      <ol class="stops">${plan.rest.map(p => `<li><span class="t"></span><span><b>${places.indexOf(p) + 1}. ${esc(p.name)}</b></span></li>`).join("")}</ol></div>` : ""}
     <p class="sub">"ניווט ביום הזה" פותח את מפות Google עם כל התחנות של היום, לפי הסדר.</p>`;
 }
 
@@ -335,7 +401,7 @@ function placeHTML(p, i, city, inFolder){
   return `<li class="place ${state.sel===i?"sel":""}" data-i="${i}">
     <div class="num">${i+1}</div><div class="body">
       <h3>${esc(p.name)}</h3>${p.local && p.local!==p.name?`<div class="local">${esc(p.local)}</div>`:""}
-      <div class="meta">${p.category && p.category !== "מקום"?`<span class="chip">${esc(p.category)}</span>`:""}${inFolder && p.city?`<span>${esc(p.city)}</span>`:""}${p.neighborhood?`<span>${esc(p.neighborhood)}</span>`:""}${p.price?`<span>${esc(p.price)}</span>`:""}</div>
+      <div class="meta">${p.category && p.category !== "מקום"?`<span class="chip">${esc(p.category)}</span>`:""}${inFolder && p.city?`<span>${esc(p.city)}</span>`:""}${areaOf(p)?`<span class="chip area-chip">${esc(areaOf(p))}</span>`:(p.neighborhood?`<span>${esc(p.neighborhood)}</span>`:"")}${p.price?`<span>${esc(p.price)}</span>`:""}</div>
       ${p.why?`<p>${esc(p.why)}</p>`:""}${p.dish?`<div class="sub">להזמין: ${esc(p.dish)}</div>`:""}
       ${p.rating?`<div class="score">★ ${(+p.rating).toFixed(1)} <small>גוגל · ${p.ratingCount||0} ביקורות</small></div>`:""}
       ${p.address?`<div class="sub">${esc(p.address.split(",").slice(0,3).join(","))}</div>`:""}
@@ -396,26 +462,27 @@ function render(){
   let html = "";
   if (folder) {
     html = `<div id="delFolderConfirm" class="setup" hidden style="margin-bottom:12px"><p style="margin:0 0 8px"><b>למחוק את התיקייה "${esc(folder.name)}" עם כל ${places.length} המקומות שבה?</b></p><div class="row"><button class="small danger" id="delFolderYes" type="button">מחק תיקייה</button><button class="small" id="delFolderNo" type="button">ביטול</button></div></div>` + (places.length
-      ? `<h3 class="sec">מסלול</h3>${routeHTML("f:" + folder.id, places, null, city)}<h3 class="sec">המקומות בתיקייה</h3><ul class="list">${places.map((p,i)=>placeHTML(p,i,p.city,true)).join("")}</ul>`
+      ? `<h3 class="sec">מסלול</h3>${routeHTML("f:" + folder.id, places, null, city, folder.name)}<h3 class="sec">המקומות בתיקייה</h3>${shareRow(shareText("list", folder.name, places, city))}<ul class="list">${places.map((p,i)=>placeHTML(p,i,p.city,true)).join("")}</ul>`
       : `<div class="empty">התיקייה ריקה.</div>`);
   } else if (state.tab === "list") {
     const savedN = places.filter(p => folderOf(withCity(p))).length;
     html = `<div class="savebar"><div><b>${savedN === places.length ? "כל המקומות שמורים בתיקיות" : `${places.length - savedN} מקומות עוד לא בתיקייה`}</b><div class="sub">שמירה לתיקייה לא מוחקת מהפיד</div></div>
       <button class="primary-link save-all" id="addAll">+ שמור הכל לתיקייה</button></div>
+      ${shareRow(shareText("list", cleanTitle(r.title), places, city))}
       <ul class="list">${places.map((p,i)=>placeHTML(p,i,city,false)).join("")}</ul>`;
   } else {
-    html = routeHTML("v", places, r.itinerary, city);
+    html = routeHTML("v", places, r.itinerary, city, cleanTitle(r.title));
   }
   $("#panel").innerHTML = html;
 }
 function renderTabs(r){
-  const routeDays = r ? (state.days.v != null ? Math.min(r.places.length, state.days.v) : (r.itinerary?.length || Math.ceil(r.places.length / 4))) : 0;
+  const routeDays = r ? (state.days.v != null ? Math.min(r.places.length, state.days.v) : (r.itinerary?.length || currentDays("v", r.places, r.itinerary).days.length)) : 0;
   const tabs = [["list","רשימה",r?.places.length||0],["route","מסלול",routeDays],["folders","התיקיות שלי",state.folders.length]].filter(([k]) => r || k === "folders");
   $("#tabs").innerHTML = tabs.map(([k,l,c]) => `<button role="tab" aria-selected="${state.tab===k}" data-tab="${k}">${l} <span class="count">${c}</span></button>`).join("");
 }
 
 document.addEventListener("click", e => {
-  const t = e.target.closest("[data-tab],[data-save],[data-remove],[data-del],[data-folder],[data-pick],[data-days],.place,#addAll,[data-video],[data-delvideo],#showAll,#backFolders,#delFolderAsk,#delFolderYes,#delFolderNo,#sheetClose,#sheet");
+  const t = e.target.closest("[data-tab],[data-save],[data-remove],[data-del],[data-folder],[data-pick],[data-days],[data-share],.place,#addAll,[data-video],[data-delvideo],#showAll,#backFolders,#delFolderAsk,#delFolderYes,#delFolderNo,#sheetClose,#sheet");
   if (!t) return;
   if (t.id === "sheet") { if (e.target === t) { state.pick = null; renderSheet(); } return; }
   if (t.id === "sheetClose") { state.pick = null; renderSheet(); return; }
@@ -433,10 +500,11 @@ document.addEventListener("click", e => {
   if (t.id === "delFolderNo") { $("#delFolderConfirm").hidden = true; return; }
   if (t.id === "delFolderYes") { const f = state.folders.find(x => x.id === state.folder); state.folders = state.folders.filter(x => x !== f); saveFolders(); state.folder = null; state.sel = null; setStatus(`התיקייה "${f.name}" נמחקה.`); render(); return; }
   if (t.matches("[data-remove]")) { const f = state.folders.find(x => x.id === state.folder); f.places.splice(+t.dataset.remove, 1); saveFolders(); state.sel = null; render(); return; }
+  if (t.matches("[data-share]")) { navigator.share({ text: decodeURIComponent(t.dataset.share) }).catch(() => {}); return; }
   if (t.matches("[data-days]")) {
     const [ctx, step] = t.dataset.days.split("|");
     const list = ctx === "v" ? state.res.places : (state.folders.find(f => "f:" + f.id === ctx)?.places || []);
-    const cur = state.days[ctx] ?? (ctx === "v" && state.res.itinerary?.length ? state.res.itinerary.length : Math.ceil(list.length / 4));
+    const cur = state.days[ctx] ?? (ctx === "v" && state.res.itinerary?.length ? state.res.itinerary.length : currentDays(ctx, list, null).days.length);
     state.days[ctx] = Math.max(1, Math.min(list.length, cur + +step));
     render(); return;
   }
