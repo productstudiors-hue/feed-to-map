@@ -102,6 +102,8 @@ button:disabled{opacity:.55;cursor:default}
 .wa{background:#1F8A4C;border-color:#1F8A4C;color:#fff;font-weight:600}
 .area{color:var(--route)}
 .area-chip{background:transparent;border:1px solid var(--route);color:var(--route)}
+.vid-chip{background:var(--warn-bg);color:var(--warn)}
+.vsum{flex-basis:100%;margin:8px 0 0;font-size:14px;line-height:1.5;color:var(--muted)}
 .day.rest{background:transparent;border-style:dashed}
 .place.has-img{grid-template-columns:28px 1fr;grid-template-areas:"ph ph" "num body"}
 .place.has-img .ph{grid-area:ph}
@@ -119,7 +121,7 @@ button:disabled{opacity:.55;cursor:default}
 </head>
 <body>
 <main class="app">
-  <header class="brand"><h1>מהפיד <span>למפה</span></h1><span class="count" id="ver">v0.9</span></header>
+  <header class="brand"><h1>מהפיד <span>למפה</span></h1><span class="count" id="ver">v1.0</span></header>
 
   <form class="scan" id="form">
     <input id="url" type="url" inputmode="url" placeholder="הדבק קישור מטיקטוק או אינסטגרם" aria-label="קישור לסרטון" required>
@@ -215,7 +217,12 @@ async function scan(raw){
       if (j.needs === "APIFY_TOKEN") $("#setup").innerHTML = `<div class="setup"><b>חסר שלב הגדרה:</b> טיקטוק מסתיר את הכיתוב משרתים בענן. צריך להוסיף מפתח Apify לשרת, ואז הקישור לבד יספיק.</div>`;
       return;
     }
-    if (!j.places?.length) { setStatus("קראתי את הסרטון אבל לא מצאתי בו שמות של מקומות.", true); return; }
+    j.places ||= [];
+    if (!j.places.length && state.deep !== false && j.source?.platform === "tiktok") {
+      setStatus("בכיתוב אין שמות של מקומות, אז אני צופה בסרטון ומקשיב לו… (עד דקה)");
+      await deepScan(j);
+    }
+    if (!j.places.length) { setStatus(state.deep === false ? "קראתי את הכיתוב של הסרטון ולא מצאתי בו שמות של מקומות. כדי לחפש גם במה שנאמר בסרטון ובטקסט שעל המסך, צריך להגדיר בשרת מפתח של Gemini." : "צפיתי בסרטון וקראתי את הכיתוב, ולא מצאתי בו שמות של מקומות.", true); return; }
     j.key = vidKey(j);
     if (j.geocoder === "google") { state.google = true; j.places.forEach(p => p.gTried = true); } else if (j.geocoder === "device") state.google = false;
     state.feed = [j, ...state.feed.filter(v => v.key !== j.key)];
@@ -552,6 +559,43 @@ function copyToFolders(v){
     if (src.rating && !fp.rating) Object.assign(fp, { rating: src.rating, ratingCount: src.ratingCount, mapsUrl: src.mapsUrl });
   }));
 }
+/* ---- deep scan: the server watches the video (speech + text on screen) with Gemini ---- */
+const deepNow = new WeakSet();
+const nameKey = n => norm(String(n || "")).replace(/\s+/g, " ").trim();
+async function deepScan(v){
+  if (state.deep === false || v.deepTried || deepNow.has(v) || v.source?.platform !== "tiktok") return false;
+  deepNow.add(v);
+  const note = $("#geoNote"); if (note) { note.hidden = false; note.textContent = "צופה בסרטון ומקשיב לו, כדי למצוא גם מקומות שנאמרו או הופיעו על המסך… (עד דקה)"; }
+  try {
+    const r = await fetch(API, { method:"POST", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${ANON}`, apikey: ANON },
+      body: JSON.stringify({ deep: v.source.url, city: v.city || "", pin: store.get("ftm_pin", "") }), signal: AbortSignal.timeout(150000) });
+    if (!r.ok) return false;
+    const j = await r.json();
+    if (!j.deep) { state.deep = false; return false; }
+    state.deep = true;
+    if (j.reason === "error") return false;           // try again next time the video is opened
+    v.deepTried = true;
+    if (j.summary) v.summary = j.summary;
+    if (!v.city && j.city) { v.city = j.city; v.country ||= j.country; }
+    const have = v.places.map(p => toks(p.name));
+    let added = 0;
+    (j.places || []).forEach(d => {
+      const t = toks(d.name);
+      const same = v.places.find((p, i) => nameKey(p.name) === nameKey(d.name) || (t.length && have[i].length && (sameName(t, new Set(have[i])) || sameName(have[i], new Set(t)))));
+      if (same) {
+        if (!same.why && d.why) same.why = d.why;
+        if (!same.dish && d.dish) same.dish = d.dish;
+        return;
+      }
+      v.places.push({ ...d, id: "d" + (v.places.length + 1), from: d.from || "speech", gTried: !!d.source });
+      have.push(t); added++;
+    });
+    if (added && v.mode === "simple" && v.places.every(p => p.lat)) v.mode = "full";
+    if (added) setStatus(`נמצאו עוד ${added} מקומות מתוך מה שנאמר או הופיע בסרטון.`);
+    return added > 0;
+  } catch { return false; }
+  finally { deepNow.delete(v); if (note) note.hidden = true; }
+}
 function locateCurrent(){
   if (state.tab === "folders") {
     const f = state.folders.find(x => x.id === state.folder);
@@ -567,8 +611,8 @@ function locateCurrent(){
   } else if (state.res) {
     const v = state.res;
     const done = () => { copyToFolders(v); saveFeed(); saveFolders(); render(); };
-    // Google first (if the key is set); the free lookups then fill only what Google didn't find.
-    googleEnrich(v.places, v.city).then(() => {
+    // Watch the video (if Gemini is set), then Google (if its key is set); the free lookups fill only what is left.
+    deepScan(v).then(() => { done(); return googleEnrich(v.places, v.city); }).then(() => {
       done();
       locatePlaces(v.places, v.city, done);
       photoPlaces(v.places, v.city, done);
@@ -583,7 +627,7 @@ function placeHTML(p, i, city, inFolder){
     ${p.img ? `<figure class="ph"><img src="${esc(p.img)}" alt="${esc(p.name)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.closest('figure').remove()"><figcaption><a href="${esc(p.imgSrc)}" target="_blank" rel="noopener" data-stop>${p.imgBy ? "גוגל · " + esc(p.imgBy) : "ויקיפדיה"}</a></figcaption></figure>` : ""}
     <div class="num">${i+1}</div><div class="body">
       <h3>${esc(p.name)}</h3>${p.local && p.local!==p.name?`<div class="local">${esc(p.local)}</div>`:""}
-      <div class="meta">${p.category && p.category !== "מקום"?`<span class="chip">${esc(p.category)}</span>`:""}${inFolder && p.city?`<span>${esc(p.city)}</span>`:""}${areaOf(p)?`<span class="chip area-chip">${esc(areaOf(p))}</span>`:(p.neighborhood?`<span>${esc(p.neighborhood)}</span>`:"")}${p.price?`<span>${esc(p.price)}</span>`:""}</div>
+      <div class="meta">${p.from === "speech" || p.from === "screen" ? `<span class="chip vid-chip">${p.from === "speech" ? "נאמר בסרטון" : "הופיע על המסך"}</span>` : ""}${p.category && p.category !== "מקום"?`<span class="chip">${esc(p.category)}</span>`:""}${inFolder && p.city?`<span>${esc(p.city)}</span>`:""}${areaOf(p)?`<span class="chip area-chip">${esc(areaOf(p))}</span>`:(p.neighborhood?`<span>${esc(p.neighborhood)}</span>`:"")}${p.price?`<span>${esc(p.price)}</span>`:""}</div>
       ${p.why?`<p>${esc(p.why)}</p>`:""}${p.dish?`<div class="sub">להזמין: ${esc(p.dish)}</div>`:""}
       ${p.rating?`<div class="score">★ ${(+p.rating).toFixed(1)} <small>גוגל · ${p.ratingCount||0} ביקורות</small></div>`:""}
       ${p.address?`<div class="sub">${esc(p.address.split(",").slice(0,3).join(","))}</div>`:""}
@@ -632,7 +676,7 @@ function render(){
   $("#title").textContent = folder ? folder.name : cleanTitle(r.title);
   $("#meta").innerHTML = folder
     ? `<button class="small" id="backFolders" type="button">› כל התיקיות</button><span>${places.length} מקומות</span><button class="small" id="delFolderAsk" type="button">מחק תיקייה</button>`
-    : `${r.source?.author?`<span>${esc(r.source.author)}</span><span>·</span>`:""}<span>${esc([r.city,r.country].filter(Boolean).join(", "))}</span>${r.mode==="simple"?`<span class="chip warn">חילוץ בסיסי</span>`:""}${r.source?.url?`<a class="sub" href="${esc(r.source.url)}" target="_blank" rel="noopener">לסרטון</a>`:""}`;
+    : `${r.source?.author?`<span>${esc(r.source.author)}</span><span>·</span>`:""}<span>${esc([r.city,r.country].filter(Boolean).join(", "))}</span>${r.mode==="simple"?`<span class="chip warn">חילוץ בסיסי</span>`:""}${r.source?.url?`<a class="sub" href="${esc(r.source.url)}" target="_blank" rel="noopener">לסרטון</a>`:""}${r.summary?`<p class="vsum"><b>מה נאמר בסרטון:</b> ${esc(r.summary)}</p>`:""}`;
 
   const sel = state.sel != null ? places[state.sel] : null;
   const src = sel ? embedOne(sel, sel.city || city) : embedAll(places, city, mode);
