@@ -109,7 +109,7 @@ button:disabled{opacity:.55;cursor:default}
 </head>
 <body>
 <main class="app">
-  <header class="brand"><h1>מהפיד <span>למפה</span></h1><span class="count" id="ver">v0.7</span></header>
+  <header class="brand"><h1>מהפיד <span>למפה</span></h1><span class="count" id="ver">v0.7.1</span></header>
 
   <form class="scan" id="form">
     <input id="url" type="url" inputmode="url" placeholder="הדבק קישור מטיקטוק או אינסטגרם" aria-label="קישור לסרטון" required>
@@ -125,6 +125,7 @@ button:disabled{opacity:.55;cursor:default}
   </form>
 
   <section class="feedbar" id="feedBar" hidden aria-label="הפיד שלי"></section>
+  <p class="status" id="geoNote" hidden></p>
   <section class="card" id="card" hidden>
     <div class="head">
       <div class="meta" id="meta"></div>
@@ -194,7 +195,7 @@ async function scan(raw){
   if (!url) { setStatus("לא מצאתי קישור. הדבק קישור שמתחיל ב־https://", true); return; }
   $("#url").value = url;
   $("#go").disabled = true; $("#bar").hidden = false; $("#setup").innerHTML = "";
-  setStatus("קורא את הסרטון ומאתר את המקומות והאזורים… (עד 20 שניות)");
+  setStatus("קורא את הסרטון ומאתר את המקומות… (כמה שניות)");
   try {
     const r = await fetch(API, { method:"POST", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${ANON}`, apikey: ANON }, body: JSON.stringify({ url, pin: store.get("ftm_pin", "") }) });
     const j = await r.json().catch(() => ({}));
@@ -211,6 +212,7 @@ async function scan(raw){
     state.res = j; state.sel = null; state.tab = "list"; state.folder = null; delete state.days.v;
     setStatus(`נמצאו ${j.places.length} מקומות. שמור אותם בתיקייה, או מחק את מה שלא מעניין אותך.`);
     render();
+    locateCurrent();
   } catch {
     setStatus("אין חיבור לשרת. בדוק את האינטרנט ונסה שוב.", true);
   } finally { $("#go").disabled = false; $("#bar").hidden = true; }
@@ -395,6 +397,78 @@ function routeHTML(ctx, places, itinerary, city, title){
     <p class="sub">"ניווט ביום הזה" פותח את מפות Google עם כל התחנות של היום, לפי הסדר.</p>`;
 }
 
+
+/* ---- find each place's location and area (OpenStreetMap via Photon), from this phone, in the background ---- */
+const GENERIC = new Set(["restaurant","ristorante","trattoria","osteria","pizzeria","cafe","caffe","caffè","café","bar","the","and","di","da","del","della","la","il","le","de","du","of","al","pasticceria","bakery","shop","store","market","hotel","tokyo","rome","roma","paris","prague","london"]);
+const norm = t => String(t || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9֐-׿぀-ヿ一-鿿 ]/g, " ");
+const toks = t => norm(t).split(/\s+/).filter(w => (w.length >= 3 || /^\d+$/.test(w)) && !GENERIC.has(w));
+const sameName = (want, got) => { const hits = want.filter(w => got.has(w)).length; return want.length <= 2 ? hits === want.length : hits >= Math.ceil(want.length * 2 / 3); };
+const kmBetween = (a, b) => { const R = 6371, dLat = (b[1]-a[1])*Math.PI/180, dLon = (b[0]-a[0])*Math.PI/180; const x = Math.sin(dLat/2)**2 + Math.cos(a[1]*Math.PI/180)*Math.cos(b[1]*Math.PI/180)*Math.sin(dLon/2)**2; return 2*R*Math.asin(Math.sqrt(x)); };
+async function photon(q, center, limit = 5){
+  const u = `https://photon.komoot.io/api/?limit=${limit}&q=${encodeURIComponent(q)}${center ? `&lon=${center[0]}&lat=${center[1]}&zoom=12` : ""}`;
+  for (let i = 0; i < 3; i++) {
+    try { const r = await fetch(u); if (r.ok) return (await r.json()).features || []; } catch {}
+    await new Promise(res => setTimeout(res, 600 * (i + 1)));
+  }
+  return null;
+}
+async function cityCenter(city){
+  const cache = store.get("ftm_cities", {});
+  if (cache[city]) return cache[city];
+  const f = (await photon(city, null, 1))?.[0];
+  const c = f?.geometry?.coordinates;
+  if (c) { cache[city] = c; store.set("ftm_cities", cache); }
+  return c;
+}
+async function locateOne(p, city, center){
+  const want = toks(p.name);
+  if (/[֐-׿]/.test(p.name) || !want.length) return "skip";
+  const feats = await photon(`${p.name} ${city}`, center);
+  if (feats === null) return "retry";
+  const hit = feats.find(f => {
+    const pr = f.properties || {};
+    if (["city","town","country","state"].includes(pr.osm_value)) return false;
+    if (kmBetween(center, f.geometry.coordinates) > 30) return false;
+    return sameName(want, new Set(toks([pr.name, pr.locality, pr.district].filter(Boolean).join(" "))));
+  });
+  if (!hit) return "none";
+  const pr = hit.properties;
+  p.lng = hit.geometry.coordinates[0]; p.lat = hit.geometry.coordinates[1];
+  p.area = pr.locality || pr.district || pr.suburb || "";
+  p.address = p.address || [pr.street && (pr.street + (pr.housenumber ? " " + pr.housenumber : "")), pr.locality || pr.district, pr.city].filter(Boolean).join(", ");
+  return "ok";
+}
+let locating = false;
+async function locatePlaces(places, city, onDone){
+  const todo = places.filter(p => !p.lat && !p.geoTried);
+  if (!todo.length || !city || locating) return;
+  locating = true;
+  const note = $("#geoNote"); if (note) { note.hidden = false; note.textContent = `מאתר מיקום ואזור ל־${todo.length} מקומות…`; }
+  try {
+    const center = await cityCenter(city);
+    if (center) {
+      const queue = [...todo];
+      let changed = 0;
+      const worker = async () => { while (queue.length) { const p = queue.shift(); const r = await locateOne(p, city, center).catch(() => "retry"); if (r !== "retry") p.geoTried = true; if (r === "ok") { changed++; onDone(); } } };
+      await Promise.all([worker(), worker()]);
+      setStatus(changed ? `נמצא מיקום ואזור ל־${changed} מקומות.` : $("#status").textContent);
+    }
+  } finally { locating = false; onDone(); if (note) note.hidden = true; }
+}
+function locateCurrent(){
+  if (state.tab === "folders") {
+    const f = state.folders.find(x => x.id === state.folder);
+    if (f) { const byCity = {}; f.places.forEach(p => (byCity[p.city || ""] ||= []).push(p)); Object.entries(byCity).forEach(([c, ps]) => locatePlaces(ps, c, () => { saveFolders(); render(); })); }
+  } else if (state.res) {
+    const v = state.res;
+    locatePlaces(v.places, v.city, () => {
+      // copy the found locations into saved folder places too
+      state.folders.forEach(f => f.places.forEach(fp => { const src = v.places.find(p => key(withCity(p)) === key(fp)); if (src?.lat && !fp.lat) Object.assign(fp, { lat: src.lat, lng: src.lng, area: src.area, address: src.address }); }));
+      saveFeed(); saveFolders(); render();
+    });
+  }
+}
+
 /* ---- render ---- */
 function placeHTML(p, i, city, inFolder){
   const f = inFolder ? null : folderOf(withCity(p));
@@ -488,13 +562,13 @@ document.addEventListener("click", e => {
   if (t.id === "sheetClose") { state.pick = null; renderSheet(); return; }
   if (t.matches("[data-pick]")) { addToFolder(t.dataset.pick); return; }
   if (t.matches("[data-tab]")) { state.tab = t.dataset.tab; state.sel = null; if (state.tab !== "folders") state.folder = null; render(); return; }
-  if (t.matches("[data-folder]")) { state.folder = t.dataset.folder; state.sel = null; render(); return; }
+  if (t.matches("[data-folder]")) { state.folder = t.dataset.folder; state.sel = null; render(); locateCurrent(); return; }
   if (t.id === "backFolders") { state.folder = null; state.sel = null; render(); return; }
   if (t.id === "showAll") { state.sel = null; render(); return; }
   if (t.id === "addAll") { openPicker(state.res.places); return; }
   if (t.matches("[data-save]")) { openPicker([state.res.places[+t.dataset.save]]); return; }
   if (t.matches("[data-del]")) { const p = state.res.places[+t.dataset.del]; removeFromFeed(x => x === p); setStatus(`"${p.name}" נמחק מהפיד.`); render(); return; }
-  if (t.matches("[data-video]")) { state.res = state.feed.find(v => v.key === t.dataset.video) || null; state.tab = "list"; state.sel = null; state.folder = null; delete state.days.v; render(); return; }
+  if (t.matches("[data-video]")) { state.res = state.feed.find(v => v.key === t.dataset.video) || null; state.tab = "list"; state.sel = null; state.folder = null; delete state.days.v; render(); locateCurrent(); return; }
   if (t.matches("[data-delvideo]")) { const v = state.feed.find(x => x.key === t.dataset.delvideo); if (v) { removeVideo(v); setStatus(`הסרטון "${cleanTitle(v.title)}" נמחק מהפיד.`); } render(); return; }
   if (t.id === "delFolderAsk") { $("#delFolderConfirm").hidden = false; return; }
   if (t.id === "delFolderNo") { $("#delFolderConfirm").hidden = true; return; }
@@ -527,6 +601,7 @@ $("#resetYes").onclick = () => {
 const qs = new URLSearchParams(location.search);
 const shared = qs.get("url") || qs.get("text") || qs.get("title");
 render();
+locateCurrent();
 if (extractUrl(shared)) { history.replaceState(null, "", location.pathname); scan(shared); }
 </script>
 </body>
