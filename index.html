@@ -119,7 +119,7 @@ button:disabled{opacity:.55;cursor:default}
 </head>
 <body>
 <main class="app">
-  <header class="brand"><h1>מהפיד <span>למפה</span></h1><span class="count" id="ver">v0.8.3</span></header>
+  <header class="brand"><h1>מהפיד <span>למפה</span></h1><span class="count" id="ver">v0.8.4</span></header>
 
   <form class="scan" id="form">
     <input id="url" type="url" inputmode="url" placeholder="הדבק קישור מטיקטוק או אינסטגרם" aria-label="קישור לסרטון" required>
@@ -425,8 +425,8 @@ async function photon(q, center, limit = 5){
 async function cityCenter(city){
   const cache = store.get("ftm_cities", {});
   if (cache[city]) return cache[city];
-  const f = (await photon(city, null, 1))?.[0];
-  const c = f?.geometry?.coordinates;
+  let c = (await photon(city, null, 1))?.[0]?.geometry?.coordinates;
+  if (!c) { const pg = (await wiki("en", `titles=${encodeURIComponent(city)}`))?.[0]?.coordinates?.[0]; if (pg) c = [pg.lon, pg.lat]; }
   if (c) { cache[city] = c; store.set("ftm_cities", cache); }
   return c;
 }
@@ -479,12 +479,14 @@ function goodPage(pg, center){
   if (!pg || pg.missing !== undefined || !pg.thumbnail?.source) return false;
   const c = pg.coordinates?.[0];
   if (!c) return false;
-  return !center || kmBetween(center, [c.lon, c.lat]) < 30;
+  return !!center && kmBetween(center, [c.lon, c.lat]) < 30;
 }
 const HE_CITY = { Tokyo:"טוקיו", Kyoto:"קיוטו", Osaka:"אוסקה", Lisbon:"ליסבון", Porto:"פורטו", Paris:"פריז", Rome:"רומא", Milan:"מילאנו", London:"לונדון", Berlin:"ברלין", Amsterdam:"אמסטרדם", Barcelona:"ברצלונה", Madrid:"מדריד", Athens:"אתונה", Bangkok:"בנגקוק", Dubai:"דובאי", Prague:"פראג", Budapest:"בודפשט", "New York":"ניו יורק", Vienna:"וינה", Seoul:"סיאול", Istanbul:"איסטנבול", Naples:"נאפולי", Florence:"פירנצה" };
 async function findPhoto(p, city){
   const lang = /[֐-׿]/.test(p.name) ? "he" : "en";
+  // Without the city's location a photo can't be checked (a "Jewish Quarter" in Jerusalem is not the one in Prague), so wait.
   const center = city ? await cityCenter(city) : null;
+  if (!center) return "retry";
   const name = p.name.replace(/[’‘`]/g, "'").replace(/[״“”]/g, '"');
   const cityWord = lang === "he" ? (HE_CITY[city] || city) : city;
   const exact = await wiki(lang, `titles=${[name, name + " (" + cityWord + ")", name + (lang === "he" ? " ב" : " in ") + cityWord].map(encodeURIComponent).join("|")}`);
