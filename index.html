@@ -540,6 +540,7 @@ async function googleEnrich(places, city){
     if (!r.ok) return;
     const j = await r.json();
     if (!j.google) { state.google = false; return; }
+    if (j.error) { state.googleError = j.error; return; }   // key refused by Google: try again next time
     state.google = true;
     (j.places || []).forEach(g => {
       const p = todo[+g.id]; if (!p) return;
