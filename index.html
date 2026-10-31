@@ -119,7 +119,7 @@ button:disabled{opacity:.55;cursor:default}
 </head>
 <body>
 <main class="app">
-  <header class="brand"><h1>מהפיד <span>למפה</span></h1><span class="count" id="ver">v0.8.1</span></header>
+  <header class="brand"><h1>מהפיד <span>למפה</span></h1><span class="count" id="ver">v0.8.2</span></header>
 
   <form class="scan" id="form">
     <input id="url" type="url" inputmode="url" placeholder="הדבק קישור מטיקטוק או אינסטגרם" aria-label="קישור לסרטון" required>
@@ -448,11 +448,12 @@ async function locateOne(p, city, center){
   p.address = p.address || [pr.street && (pr.street + (pr.housenumber ? " " + pr.housenumber : "")), pr.locality || pr.district, pr.city].filter(Boolean).join(", ");
   return "ok";
 }
-let locating = false;
+// One lookup per list at a time, but different videos and folders can run side by side.
+const locatingNow = new WeakSet(), photographingNow = new WeakSet();
 async function locatePlaces(places, city, onDone){
   const todo = places.filter(p => !p.lat && !p.geoTried);
-  if (!todo.length || !city || locating) return;
-  locating = true;
+  if (!todo.length || !city || locatingNow.has(places)) return;
+  locatingNow.add(places);
   const note = $("#geoNote"); if (note) { note.hidden = false; note.textContent = `מאתר מיקום ואזור ל־${todo.length} מקומות…`; }
   try {
     const center = await cityCenter(city);
@@ -463,7 +464,7 @@ async function locatePlaces(places, city, onDone){
       await Promise.all([worker(), worker()]);
       setStatus(changed ? `נמצא מיקום ואזור ל־${changed} מקומות.` : $("#status").textContent);
     }
-  } finally { locating = false; onDone(); if (note) note.hidden = true; }
+  } finally { locatingNow.delete(places); onDone(); if (note) note.hidden = true; }
 }
 
 /* ---- photos from Wikipedia (free images, with a link to the source page) ---- */
@@ -500,16 +501,15 @@ async function findPhoto(p, city){
   if (!p.lat && pg.coordinates?.[0]) { p.lat = pg.coordinates[0].lat; p.lng = pg.coordinates[0].lon; }
   return "ok";
 }
-let photographing = false;
 async function photoPlaces(places, city, onDone){
   const todo = places.filter(p => !p.img && !p.imgTried);
-  if (!todo.length || photographing) return;
-  photographing = true;
+  if (!todo.length || photographingNow.has(places)) return;
+  photographingNow.add(places);
   try {
     const queue = [...todo];
     const worker = async () => { while (queue.length) { const p = queue.shift(); const r = await findPhoto(p, p.city || city).catch(() => "retry"); if (r !== "retry") p.imgTried = true; if (r === "ok") onDone(); } };
     await Promise.all([worker(), worker()]);
-  } finally { photographing = false; onDone(); }
+  } finally { photographingNow.delete(places); onDone(); }
 }
 
 function locateCurrent(){
