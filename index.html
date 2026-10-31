@@ -119,7 +119,7 @@ button:disabled{opacity:.55;cursor:default}
 </head>
 <body>
 <main class="app">
-  <header class="brand"><h1>מהפיד <span>למפה</span></h1><span class="count" id="ver">v0.8.4</span></header>
+  <header class="brand"><h1>מהפיד <span>למפה</span></h1><span class="count" id="ver">v0.9</span></header>
 
   <form class="scan" id="form">
     <input id="url" type="url" inputmode="url" placeholder="הדבק קישור מטיקטוק או אינסטגרם" aria-label="קישור לסרטון" required>
@@ -217,6 +217,7 @@ async function scan(raw){
     }
     if (!j.places?.length) { setStatus("קראתי את הסרטון אבל לא מצאתי בו שמות של מקומות.", true); return; }
     j.key = vidKey(j);
+    if (j.geocoder === "google") { state.google = true; j.places.forEach(p => p.gTried = true); } else if (j.geocoder === "device") state.google = false;
     state.feed = [j, ...state.feed.filter(v => v.key !== j.key)];
     saveFeed();
     state.res = j; state.sel = null; state.tab = "list"; state.folder = null; delete state.days.v;
@@ -517,24 +518,60 @@ async function photoPlaces(places, city, onDone){
   } finally { photographingNow.delete(places); onDone(); }
 }
 
+/* ---- Google Places (when the server has a Google key): exact location, area, rating and a photo ---- */
+const GKEYS = ["lat","lng","address","area","rating","ratingCount","mapsUrl","img","imgSrc","imgBy","source"];
+const googlingNow = new WeakSet();
+async function googleEnrich(places, city){
+  if (state.google === false || googlingNow.has(places)) return;
+  const todo = places.filter(p => !p.gTried);
+  if (!todo.length) return;
+  googlingNow.add(places);
+  try {
+    const r = await fetch(API, { method:"POST", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${ANON}`, apikey: ANON },
+      body: JSON.stringify({ enrich: todo.map((p, i) => ({ id: String(i), name: p.name, query: p.query })), city: city || "", pin: store.get("ftm_pin", "") }),
+      signal: AbortSignal.timeout(40000) });
+    if (!r.ok) return;
+    const j = await r.json();
+    if (!j.google) { state.google = false; return; }
+    state.google = true;
+    (j.places || []).forEach(g => {
+      const p = todo[+g.id]; if (!p) return;
+      GKEYS.forEach(k => { if (g[k] !== undefined && g[k] !== null && g[k] !== "") p[k] = g[k]; });
+      if (g.lat) p.geoTried = true;
+      if (g.img) p.imgTried = true;
+    });
+    todo.forEach(p => p.gTried = true);
+  } catch {} finally { googlingNow.delete(places); }
+}
+function copyToFolders(v){
+  state.folders.forEach(f => f.places.forEach(fp => {
+    const src = v.places.find(p => key(withCity(p)) === key(fp));
+    if (!src) return;
+    if (src.lat && !fp.lat) Object.assign(fp, { lat: src.lat, lng: src.lng, area: src.area, address: src.address });
+    if (src.img && (!fp.img || (src.imgBy && !fp.imgBy))) Object.assign(fp, { img: src.img, imgSrc: src.imgSrc, imgBy: src.imgBy });
+    if (src.rating && !fp.rating) Object.assign(fp, { rating: src.rating, ratingCount: src.ratingCount, mapsUrl: src.mapsUrl });
+  }));
+}
 function locateCurrent(){
   if (state.tab === "folders") {
     const f = state.folders.find(x => x.id === state.folder);
     if (f) {
       const byCity = {}; f.places.forEach(p => (byCity[p.city || ""] ||= []).push(p));
-      Object.entries(byCity).forEach(([c, ps]) => locatePlaces(ps, c, () => { saveFolders(); render(); }));
-      photoPlaces(f.places, "", () => { saveFolders(); render(); });
+      const done = () => { saveFolders(); render(); };
+      Promise.all(Object.entries(byCity).map(([c, ps]) => googleEnrich(ps, c))).then(() => {
+        done();
+        Object.entries(byCity).forEach(([c, ps]) => locatePlaces(ps, c, done));
+        photoPlaces(f.places, "", done);
+      });
     }
   } else if (state.res) {
     const v = state.res;
-    locatePlaces(v.places, v.city, () => {
-      // copy the found locations into saved folder places too
-      state.folders.forEach(f => f.places.forEach(fp => { const src = v.places.find(p => key(withCity(p)) === key(fp)); if (src?.lat && !fp.lat) Object.assign(fp, { lat: src.lat, lng: src.lng, area: src.area, address: src.address }); }));
-      saveFeed(); saveFolders(); render();
-    });
-    photoPlaces(v.places, v.city, () => {
-      state.folders.forEach(f => f.places.forEach(fp => { const src = v.places.find(p => key(withCity(p)) === key(fp)); if (src?.img && !fp.img) Object.assign(fp, { img: src.img, imgSrc: src.imgSrc }); }));
-      saveFeed(); saveFolders(); render();
+    const done = () => { copyToFolders(v); saveFeed(); saveFolders(); render(); };
+    // Google first (if the key is set); the free lookups then fill only what Google didn't find.
+    googleEnrich(v.places, v.city).then(() => {
+      done();
+      locatePlaces(v.places, v.city, done);
+      photoPlaces(v.places, v.city, done);
     });
   }
 }
@@ -543,7 +580,7 @@ function locateCurrent(){
 function placeHTML(p, i, city, inFolder){
   const f = inFolder ? null : folderOf(withCity(p));
   return `<li class="place ${state.sel===i?"sel":""} ${p.img ? "has-img" : ""}" data-i="${i}">
-    ${p.img ? `<figure class="ph"><img src="${esc(p.img)}" alt="${esc(p.name)}" loading="lazy" referrerpolicy="no-referrer"><figcaption><a href="${esc(p.imgSrc)}" target="_blank" rel="noopener" data-stop>ויקיפדיה</a></figcaption></figure>` : ""}
+    ${p.img ? `<figure class="ph"><img src="${esc(p.img)}" alt="${esc(p.name)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.closest('figure').remove()"><figcaption><a href="${esc(p.imgSrc)}" target="_blank" rel="noopener" data-stop>${p.imgBy ? "גוגל · " + esc(p.imgBy) : "ויקיפדיה"}</a></figcaption></figure>` : ""}
     <div class="num">${i+1}</div><div class="body">
       <h3>${esc(p.name)}</h3>${p.local && p.local!==p.name?`<div class="local">${esc(p.local)}</div>`:""}
       <div class="meta">${p.category && p.category !== "מקום"?`<span class="chip">${esc(p.category)}</span>`:""}${inFolder && p.city?`<span>${esc(p.city)}</span>`:""}${areaOf(p)?`<span class="chip area-chip">${esc(areaOf(p))}</span>`:(p.neighborhood?`<span>${esc(p.neighborhood)}</span>`:"")}${p.price?`<span>${esc(p.price)}</span>`:""}</div>
