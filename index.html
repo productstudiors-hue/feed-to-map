@@ -119,7 +119,7 @@ button:disabled{opacity:.55;cursor:default}
 </head>
 <body>
 <main class="app">
-  <header class="brand"><h1>מהפיד <span>למפה</span></h1><span class="count" id="ver">v0.8</span></header>
+  <header class="brand"><h1>מהפיד <span>למפה</span></h1><span class="count" id="ver">v0.8.1</span></header>
 
   <form class="scan" id="form">
     <input id="url" type="url" inputmode="url" placeholder="הדבק קישור מטיקטוק או אינסטגרם" aria-label="קישור לסרטון" required>
@@ -485,7 +485,9 @@ async function findPhoto(p, city){
   const center = city ? await cityCenter(city) : null;
   const exact = await wiki(lang, `titles=${encodeURIComponent(p.name)}`);
   if (exact === null) return "retry";
-  let pg = exact.find(x => goodPage(x, center));
+  // A one-word name that Wikipedia redirects elsewhere ("Damaso" -> a church) is too risky to trust.
+  const oneWord = toks(p.name).length < 2;
+  let pg = exact.find(x => goodPage(x, center) && (!oneWord || norm(x.title).trim() === norm(p.name).trim()));
   if (!pg) {
     const found = await wiki(lang, `generator=search&gsrlimit=3&gsrsearch=${encodeURIComponent(p.name + (city ? " " + city : ""))}`);
     if (found === null) return "retry";
