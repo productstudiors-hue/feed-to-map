@@ -103,13 +103,23 @@ button:disabled{opacity:.55;cursor:default}
 .area{color:var(--route)}
 .area-chip{background:transparent;border:1px solid var(--route);color:var(--route)}
 .day.rest{background:transparent;border-style:dashed}
+.place.has-img{grid-template-columns:28px 1fr;grid-template-areas:"ph ph" "num body"}
+.place.has-img .ph{grid-area:ph}
+.place.has-img .num{grid-area:num}
+.place.has-img .body{grid-area:body}
+.ph{margin:-12px -12px 4px;position:relative;border-radius:14px 14px 0 0;overflow:hidden;background:var(--soft)}
+.ph img{display:block;width:100%;height:170px;object-fit:cover}
+.ph figcaption{position:absolute;bottom:6px;left:8px;font-size:11px}
+.ph figcaption a{background:rgba(17,22,25,.6);color:#fff;padding:2px 8px;border-radius:99px;text-decoration:none}
+.vbtn{position:relative}
+.vthumb{width:100%;height:96px;object-fit:cover;border-radius:8px;margin-bottom:6px}
 .reset{margin-top:28px;display:flex;flex-direction:column;align-items:flex-start;gap:10px}
 .danger{background:var(--pin);color:var(--pin-ink);border-color:var(--pin)}
 </style>
 </head>
 <body>
 <main class="app">
-  <header class="brand"><h1>מהפיד <span>למפה</span></h1><span class="count" id="ver">v0.7.2</span></header>
+  <header class="brand"><h1>מהפיד <span>למפה</span></h1><span class="count" id="ver">v0.8</span></header>
 
   <form class="scan" id="form">
     <input id="url" type="url" inputmode="url" placeholder="הדבק קישור מטיקטוק או אינסטגרם" aria-label="קישור לסרטון" required>
@@ -455,15 +465,68 @@ async function locatePlaces(places, city, onDone){
     }
   } finally { locating = false; onDone(); if (note) note.hidden = true; }
 }
+
+/* ---- photos from Wikipedia (free images, with a link to the source page) ---- */
+// A photo is used only when the Wikipedia page is a real place near this city, so a restaurant
+// called "Otello" never gets a picture of the opera.
+async function wiki(lang, params){
+  const u = `https://${lang}.wikipedia.org/w/api.php?action=query&format=json&origin=*&redirects=1&prop=pageimages|coordinates&piprop=thumbnail&pithumbsize=480&${params}`;
+  try { const r = await fetch(u, { signal: AbortSignal.timeout(6000) }); if (r.ok) return Object.values((await r.json()).query?.pages || {}).sort((a, b) => (a.index ?? 0) - (b.index ?? 0)); } catch {}
+  return null;
+}
+function goodPage(pg, center){
+  if (!pg || pg.missing !== undefined || !pg.thumbnail?.source) return false;
+  const c = pg.coordinates?.[0];
+  if (!c) return false;
+  return !center || kmBetween(center, [c.lon, c.lat]) < 30;
+}
+async function findPhoto(p, city){
+  const lang = /[֐-׿]/.test(p.name) ? "he" : "en";
+  const center = city ? await cityCenter(city) : null;
+  const exact = await wiki(lang, `titles=${encodeURIComponent(p.name)}`);
+  if (exact === null) return "retry";
+  let pg = exact.find(x => goodPage(x, center));
+  if (!pg) {
+    const found = await wiki(lang, `generator=search&gsrlimit=3&gsrsearch=${encodeURIComponent(p.name + (city ? " " + city : ""))}`);
+    if (found === null) return "retry";
+    const want = toks(p.name);
+    pg = found.find(x => goodPage(x, center) && want.length && sameName(want, new Set(toks(x.title))));
+  }
+  if (!pg) return "none";
+  p.img = pg.thumbnail.source;
+  p.imgSrc = `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(pg.title.replace(/ /g, "_"))}`;
+  if (!p.lat && pg.coordinates?.[0]) { p.lat = pg.coordinates[0].lat; p.lng = pg.coordinates[0].lon; }
+  return "ok";
+}
+let photographing = false;
+async function photoPlaces(places, city, onDone){
+  const todo = places.filter(p => !p.img && !p.imgTried);
+  if (!todo.length || photographing) return;
+  photographing = true;
+  try {
+    const queue = [...todo];
+    const worker = async () => { while (queue.length) { const p = queue.shift(); const r = await findPhoto(p, p.city || city).catch(() => "retry"); if (r !== "retry") p.imgTried = true; if (r === "ok") onDone(); } };
+    await Promise.all([worker(), worker()]);
+  } finally { photographing = false; onDone(); }
+}
+
 function locateCurrent(){
   if (state.tab === "folders") {
     const f = state.folders.find(x => x.id === state.folder);
-    if (f) { const byCity = {}; f.places.forEach(p => (byCity[p.city || ""] ||= []).push(p)); Object.entries(byCity).forEach(([c, ps]) => locatePlaces(ps, c, () => { saveFolders(); render(); })); }
+    if (f) {
+      const byCity = {}; f.places.forEach(p => (byCity[p.city || ""] ||= []).push(p));
+      Object.entries(byCity).forEach(([c, ps]) => locatePlaces(ps, c, () => { saveFolders(); render(); }));
+      photoPlaces(f.places, "", () => { saveFolders(); render(); });
+    }
   } else if (state.res) {
     const v = state.res;
     locatePlaces(v.places, v.city, () => {
       // copy the found locations into saved folder places too
       state.folders.forEach(f => f.places.forEach(fp => { const src = v.places.find(p => key(withCity(p)) === key(fp)); if (src?.lat && !fp.lat) Object.assign(fp, { lat: src.lat, lng: src.lng, area: src.area, address: src.address }); }));
+      saveFeed(); saveFolders(); render();
+    });
+    photoPlaces(v.places, v.city, () => {
+      state.folders.forEach(f => f.places.forEach(fp => { const src = v.places.find(p => key(withCity(p)) === key(fp)); if (src?.img && !fp.img) Object.assign(fp, { img: src.img, imgSrc: src.imgSrc }); }));
       saveFeed(); saveFolders(); render();
     });
   }
@@ -472,7 +535,8 @@ function locateCurrent(){
 /* ---- render ---- */
 function placeHTML(p, i, city, inFolder){
   const f = inFolder ? null : folderOf(withCity(p));
-  return `<li class="place ${state.sel===i?"sel":""}" data-i="${i}">
+  return `<li class="place ${state.sel===i?"sel":""} ${p.img ? "has-img" : ""}" data-i="${i}">
+    ${p.img ? `<figure class="ph"><img src="${esc(p.img)}" alt="${esc(p.name)}" loading="lazy" referrerpolicy="no-referrer"><figcaption><a href="${esc(p.imgSrc)}" target="_blank" rel="noopener" data-stop>ויקיפדיה</a></figcaption></figure>` : ""}
     <div class="num">${i+1}</div><div class="body">
       <h3>${esc(p.name)}</h3>${p.local && p.local!==p.name?`<div class="local">${esc(p.local)}</div>`:""}
       <div class="meta">${p.category && p.category !== "מקום"?`<span class="chip">${esc(p.category)}</span>`:""}${inFolder && p.city?`<span>${esc(p.city)}</span>`:""}${areaOf(p)?`<span class="chip area-chip">${esc(areaOf(p))}</span>`:(p.neighborhood?`<span>${esc(p.neighborhood)}</span>`:"")}${p.price?`<span>${esc(p.price)}</span>`:""}</div>
@@ -491,7 +555,7 @@ function renderFeedBar(){
   el.innerHTML = `<div class="feedhead"><b>הפיד שלי</b><span class="sub">${state.feed.length} סרטונים</span></div>
     <ul class="vids">${state.feed.map(v => {
       const on = v === state.res && state.tab !== "folders";
-      return `<li class="vid ${on ? "on" : ""}"><button class="vbtn" data-video="${esc(v.key)}" aria-current="${on}"><span class="vt">${esc(cleanTitle(v.title))}</span><span class="sub">${esc(v.source?.author || "")}${v.city ? " · " + esc(v.city) : ""} · ${v.places.length} מקומות</span></button><button class="vdel" data-delvideo="${esc(v.key)}" aria-label="מחק את הסרטון מהפיד">✕</button></li>`;
+      return `<li class="vid ${on ? "on" : ""}"><button class="vbtn" data-video="${esc(v.key)}" aria-current="${on}">${v.source?.thumbnail ? `<img class="vthumb" src="${esc(v.source.thumbnail)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}<span class="vt">${esc(cleanTitle(v.title))}</span><span class="sub">${esc(v.source?.author || "")}${v.city ? " · " + esc(v.city) : ""} · ${v.places.length} מקומות</span></button><button class="vdel" data-delvideo="${esc(v.key)}" aria-label="מחק את הסרטון מהפיד">✕</button></li>`;
     }).join("")}</ul>`;
 }
 
