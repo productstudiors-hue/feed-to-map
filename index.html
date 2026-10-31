@@ -104,7 +104,7 @@ button:disabled{opacity:.55;cursor:default}
 </head>
 <body>
 <main class="app">
-  <header class="brand"><h1>מהפיד <span>למפה</span></h1><span class="count" id="ver">v0.6</span></header>
+  <header class="brand"><h1>מהפיד <span>למפה</span></h1><span class="count" id="ver">v0.6.1</span></header>
 
   <form class="scan" id="form">
     <input id="url" type="url" inputmode="url" placeholder="הדבק קישור מטיקטוק או אינסטגרם" aria-label="קישור לסרטון" required>
@@ -177,7 +177,7 @@ function openRoute(places, city){
   return u;
 }
 
-const cleanTitle = t => (String(t || "").split(/📍|\d\uFE0F?\u20E3/u)[0]
+const cleanTitle = t => (String(t || "").split(/📍|\d\uFE0F?\u20E3|\s\d{1,2}[.)]\s/u)[0]
   .replace(/[\u{1F1E6}-\u{1F1FF}\u{1F300}-\u{1FAFF}\u2600-\u27BF\uFE0F]/gu, "").replace(/\s+/g, " ").trim().slice(0, 70)) || "תוצאות";
 
 /* ---- scanning ---- */
@@ -335,7 +335,7 @@ function placeHTML(p, i, city, inFolder){
   return `<li class="place ${state.sel===i?"sel":""}" data-i="${i}">
     <div class="num">${i+1}</div><div class="body">
       <h3>${esc(p.name)}</h3>${p.local && p.local!==p.name?`<div class="local">${esc(p.local)}</div>`:""}
-      <div class="meta">${p.category?`<span class="chip">${esc(p.category)}</span>`:""}${inFolder && p.city?`<span>${esc(p.city)}</span>`:""}${p.neighborhood?`<span>${esc(p.neighborhood)}</span>`:""}${p.price?`<span>${esc(p.price)}</span>`:""}${!(p.lat)?`<span class="chip warn">מיקום לא אומת</span>`:""}</div>
+      <div class="meta">${p.category && p.category !== "מקום"?`<span class="chip">${esc(p.category)}</span>`:""}${inFolder && p.city?`<span>${esc(p.city)}</span>`:""}${p.neighborhood?`<span>${esc(p.neighborhood)}</span>`:""}${p.price?`<span>${esc(p.price)}</span>`:""}</div>
       ${p.why?`<p>${esc(p.why)}</p>`:""}${p.dish?`<div class="sub">להזמין: ${esc(p.dish)}</div>`:""}
       ${p.rating?`<div class="score">★ ${(+p.rating).toFixed(1)} <small>גוגל · ${p.ratingCount||0} ביקורות</small></div>`:""}
       ${p.address?`<div class="sub">${esc(p.address.split(",").slice(0,3).join(","))}</div>`:""}
