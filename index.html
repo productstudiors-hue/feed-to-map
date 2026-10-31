@@ -120,9 +120,11 @@ let state = { res: store.get("ftm_last", null), tab: "list", sel: null, trip: st
 // Google resolves place names to the real business; raw coordinates show street addresses instead.
 const loc = (p, city) => p.query || [p.name, p.neighborhood && /[a-z]/i.test(p.neighborhood) ? p.neighborhood : "", p.city || city].filter(Boolean).join(", ") || `${p.lat},${p.lng}`;
 const label = (p, city) => [p.name, city].filter(Boolean).join(", ");
-function embedAll(places, city){
+function embedAll(places, city, mode){
   const pts = places.slice(0, 10);
   if (!pts.length) return "about:blank";
+  // One unknown stop breaks a Google route, so without smart extraction show the city and let the user tap places.
+  if (mode === "simple" && city) return `https://maps.google.com/maps?output=embed&hl=he&z=13&q=${encodeURIComponent(city)}`;
   if (pts.length === 1) return embedOne(pts[0], city);
   const [first, ...rest] = pts;
   return `https://maps.google.com/maps?output=embed&hl=he&saddr=${encodeURIComponent(loc(first, city))}&daddr=${rest.map(p => encodeURIComponent(loc(p, city))).join("+to:")}`;
@@ -138,6 +140,9 @@ function openRoute(places, city){
   if (q.length > 2) u += `&waypoints=${q.slice(1,-1).join("%7C")}`;
   return u;
 }
+
+const cleanTitle = t => (String(t || "").split(/📍|\d\uFE0F?\u20E3/u)[0]
+  .replace(/[\u{1F1E6}-\u{1F1FF}\u{1F300}-\u{1FAFF}\u2600-\u27BF\uFE0F]/gu, "").replace(/\s+/g, " ").trim().slice(0, 70)) || "תוצאות";
 
 /* ---- scanning ---- */
 function setStatus(t, err){ $("#status").textContent = t; $("#status").classList.toggle("err", !!err); }
@@ -201,14 +206,14 @@ function render(){
   const places = onTrip ? state.trip : r.places;
   const city = onTrip ? "" : (r.city || "");
   $("#card").hidden = false; $("#tabs").hidden = false;
-  $("#title").textContent = onTrip ? "הטיול שלי" : (r.title || "תוצאות");
+  $("#title").textContent = onTrip ? "הטיול שלי" : cleanTitle(r.title);
   $("#meta").innerHTML = onTrip ? `<span>${state.trip.length} מקומות מכל הסרטונים</span>` :
     `${r.source?.author?`<span>${esc(r.source.author)}</span><span>·</span>`:""}<span>${esc([r.city,r.country].filter(Boolean).join(", "))}</span>${r.mode==="simple"?`<span class="chip warn">חילוץ בסיסי</span>`:""}${r.source?.url?`<a class="sub" href="${esc(r.source.url)}" target="_blank" rel="noopener">לסרטון</a>`:""}`;
 
   const sel = state.sel != null ? places[state.sel] : null;
-  const src = sel ? embedOne(sel, sel.city || city) : embedAll(places, city);
+  const src = sel ? embedOne(sel, sel.city || city) : embedAll(places, city, onTrip ? "" : r.mode);
   if ($("#gmap").dataset.src !== src) { $("#gmap").src = src; $("#gmap").dataset.src = src; }
-  $("#mapLabel").textContent = sel ? `${state.sel+1}. ${sel.name}` : (places.length > 1 ? "כל המקומות, לפי סדר המסלול" : "");
+  $("#mapLabel").textContent = sel ? `${state.sel+1}. ${sel.name}` : (!onTrip && r.mode === "simple" ? "לחץ על מקום ברשימה כדי לראות אותו במפה" : (places.length > 1 ? "כל המקומות, לפי סדר המסלול" : ""));
   $("#showAll").hidden = !sel;
   $("#openG").href = sel ? openOne(sel, sel.city || city) : openRoute(places, city);
 
