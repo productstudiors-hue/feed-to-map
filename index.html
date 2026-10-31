@@ -84,11 +84,13 @@ button:disabled{opacity:.55;cursor:default}
 .sec{font-family:var(--f-display);font-size:24px;line-height:1;margin:14px 0 8px}
 .primary-link{background:var(--ink);color:var(--paper);border-color:var(--ink)}
 #panel .day+.day{margin-top:10px}
+.reset{margin-top:28px;display:flex;flex-direction:column;align-items:flex-start;gap:10px}
+.danger{background:var(--pin);color:var(--pin-ink);border-color:var(--pin)}
 </style>
 </head>
 <body>
 <main class="app">
-  <header class="brand"><h1>מהפיד <span>למפה</span></h1><span class="count" id="ver">v0.3</span></header>
+  <header class="brand"><h1>מהפיד <span>למפה</span></h1><span class="count" id="ver">v0.4</span></header>
 
   <form class="scan" id="form">
     <input id="url" type="url" inputmode="url" placeholder="הדבק קישור מטיקטוק או אינסטגרם" aria-label="קישור לסרטון" required>
@@ -115,6 +117,13 @@ button:disabled{opacity:.55;cursor:default}
 
   <nav class="tabs" role="tablist" id="tabs" hidden></nav>
   <section id="panel"></section>
+  <footer class="reset" id="resetBox">
+    <button class="small" id="resetAsk" type="button">איפוס האפליקציה</button>
+    <div id="resetConfirm" class="setup" hidden>
+      <p style="margin:0 0 8px"><b>למחוק מהמכשיר הזה את כל התיקיות, הסרטונים והמקומות?</b> אי אפשר לבטל את זה.</p>
+      <div class="row"><button class="small danger" id="resetYes" type="button">מחק הכל</button><button class="small" id="resetNo" type="button">ביטול</button></div>
+    </div>
+  </footer>
 </main>
 <div id="sheet" class="sheet-bg" hidden></div>
 
@@ -371,6 +380,18 @@ document.addEventListener("click", e => {
   }
   if (t.matches(".place") && !e.target.closest("[data-stop]")) { const i = +t.dataset.i; state.sel = state.sel === i ? null : i; render(); $(".map").scrollIntoView({behavior:"smooth", block:"nearest"}); }
 });
+
+/* ---- reset everything stored on this device ---- */
+$("#resetAsk").onclick = () => { $("#resetConfirm").hidden = false; $("#resetAsk").hidden = true; };
+$("#resetNo").onclick = () => { $("#resetConfirm").hidden = true; $("#resetAsk").hidden = false; };
+$("#resetYes").onclick = () => {
+  try { Object.keys(localStorage).filter(k => k.startsWith("ftm_")).forEach(k => localStorage.removeItem(k)); } catch {}
+  state = { res: null, tab: "list", sel: null, folders: [], folder: null, days: {}, pick: null };
+  $("#url").value = ""; $("#gmap").removeAttribute("src"); delete $("#gmap").dataset.src;
+  $("#resetConfirm").hidden = true; $("#resetAsk").hidden = false;
+  setStatus("האפליקציה אופסה. אפשר להתחיל מחדש.");
+  render(); window.scrollTo({ top: 0 });
+};
 
 /* shared from another app, or opened with ?url= */
 const qs = new URLSearchParams(location.search);
