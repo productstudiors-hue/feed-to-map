@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#18212B">
+<title>מהפיד למפה</title>
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Karantina:wght@700&family=Rubik:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --paper:#F1F4F2; --surface:#FFFFFF; --ink:#18212B; --muted:#5D6B72; --line:#D3DCD8;
+  --pin:#C92F6F; --pin-ink:#FFFFFF; --route:#0F7F74; --soft:#E4ECE9; --warn:#9A6200; --warn-bg:#FBF0DA;
+  --f-display:"Karantina","Rubik",system-ui,sans-serif; --f-body:"Rubik","Segoe UI",Arial,sans-serif; --f-mono:"IBM Plex Mono",ui-monospace,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root{
+  --paper:#111619; --surface:#1A2126; --ink:#E6ECEA; --muted:#97A6AC; --line:#2D383E;
+  --pin:#EC5F98; --pin-ink:#1A0A11; --route:#3DBFAE; --soft:#222C31; --warn:#E9B65A; --warn-bg:#33281A; color-scheme:dark}}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.app{max-width:640px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px 40px;display:flex;flex-direction:column;gap:14px}
+h1,h2,h3{margin:0;text-wrap:balance}
+.brand{display:flex;align-items:baseline;justify-content:space-between}
+.brand h1{font-family:var(--f-display);font-size:40px;line-height:1}
+.brand h1 span{color:var(--pin)}
+.scan{display:flex;gap:8px}
+.scan input{flex:1;min-width:0;font:inherit;font-family:var(--f-mono);font-size:13px;direction:ltr;text-align:left;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px}
+button,.btn{font:inherit;font-weight:500;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:10px 14px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-size:14px;white-space:nowrap}
+button.primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+button:disabled{opacity:.55;cursor:default}
+.small{padding:6px 10px;font-size:13px;border-radius:10px}
+:focus-visible{outline:2px solid var(--route);outline-offset:2px}
+.status{margin:0;font-size:13px;color:var(--muted);min-height:1.2em}
+.status.err{color:var(--pin)}
+.bar{height:3px;background:var(--soft);border-radius:3px;overflow:hidden}
+.bar i{display:block;height:100%;width:30%;background:var(--pin);animation:slide 1.2s ease-in-out infinite}
+@keyframes slide{from{transform:translateX(120%)}to{transform:translateX(-340%)}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.head{padding:14px 14px 10px;display:flex;flex-direction:column;gap:4px}
+.head h2{font-family:var(--f-display);font-size:32px;line-height:1.05}
+.meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--muted)}
+.chip{font-size:11px;font-weight:500;padding:2px 8px;border-radius:99px;background:var(--soft);color:var(--ink)}
+.chip.warn{background:var(--warn-bg);color:var(--warn)}
+.map{position:relative;aspect-ratio:4/3.4;max-height:62vh;width:100%;background:var(--soft)}
+.map iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.mapbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:space-between;padding:8px 12px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
+.tabs{display:flex;gap:4px;background:var(--soft);padding:4px;border-radius:12px}
+.tabs button{flex:1;border:0;background:transparent;padding:8px 6px}
+.tabs button[aria-selected=true]{background:var(--surface);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.count{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.place{display:grid;grid-template-columns:28px 1fr;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px;cursor:pointer}
+.place.sel{border-color:var(--pin);box-shadow:0 0 0 1px var(--pin)}
+.num{width:26px;height:26px;border-radius:50%;background:var(--pin);color:var(--pin-ink);font-family:var(--f-mono);font-size:12px;display:grid;place-items:center}
+.body{min-width:0;display:flex;flex-direction:column;gap:4px}
+.body h3{font-size:16px;font-weight:600}
+.local{font-size:12px;color:var(--muted)}
+.body p{margin:0;font-size:14px}
+.sub{font-size:13px;color:var(--muted)}
+.score{font-family:var(--f-mono);font-size:13px}
+.score small{font-family:var(--f-body);color:var(--muted)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.day{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.day h3{font-family:var(--f-display);font-size:24px;line-height:1}
+.stops{list-style:none;margin:0;padding:0 12px 0 0;border-right:2px solid var(--line);display:flex;flex-direction:column;gap:6px}
+.stops li{display:flex;gap:10px;align-items:baseline}
+.stops .t{font-family:var(--f-mono);font-size:11px;color:var(--muted);min-width:50px}
+.empty{color:var(--muted);text-align:center;padding:28px 10px;font-size:14px}
+.setup{background:var(--warn-bg);color:var(--warn);border-radius:12px;padding:12px;font-size:13px}
+.setup b{color:var(--ink)}
+</style>
+</head>
+<body>
+<main class="app">
+  <header class="brand"><h1>מהפיד <span>למפה</span></h1><span class="count" id="ver">v0.2</span></header>
+
+  <form class="scan" id="form">
+    <input id="url" type="url" inputmode="url" placeholder="הדבק קישור מטיקטוק או אינסטגרם" aria-label="קישור לסרטון" required>
+    <button class="primary" id="go" type="submit">סרוק</button>
+  </form>
+  <div class="row"><button class="small" id="paste" type="button">הדבק מהלוח</button><span class="sub">או: שתף מטיקטוק ← מהפיד למפה (באנדרואיד, אחרי "הוסף למסך הבית")</span></div>
+  <div class="bar" id="bar" hidden><i></i></div>
+  <p class="status" id="status" role="status"></p>
+  <div id="setup"></div>
+  <form class="scan" id="pinForm" hidden>
+    <input id="pin" type="password" inputmode="numeric" autocomplete="off" placeholder="קוד גישה אישי" aria-label="קוד גישה אישי" style="direction:rtl;text-align:right;font-family:var(--f-body)">
+    <button class="primary" type="submit">שמור</button>
+  </form>
+
+  <section class="card" id="card" hidden>
+    <div class="head">
+      <div class="meta" id="meta"></div>
+      <h2 id="title"></h2>
+    </div>
+    <div class="map"><iframe id="gmap" title="מפת גוגל" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe></div>
+    <div class="mapbar"><span id="mapLabel">כל המקומות</span>
+      <span class="row"><button class="small" id="showAll" type="button" hidden>הצג הכל</button><a class="btn small" id="openG" target="_blank" rel="noopener">פתח באפליקציית מפות</a></span></div>
+  </section>
+
+  <nav class="tabs" role="tablist" id="tabs" hidden></nav>
+  <section id="panel"></section>
+</main>
+
+<script>
+/* ---- config: the server that reads the video ---- */
+const API = "https://klzbaonibjyktzxhkjcg.supabase.co/functions/v1/scan";
+const ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtsemJhb25pYmp5a3R6eGhramNnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0MzEzMTcsImV4cCI6MjEwOTAwNzMxN30.Y-lq_5AhnQ5oHWcjms502FJT2rbTNx8qhS-SS-4hzXE";
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const store = { get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch{return d}}, set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}} };
+
+let state = { res: store.get("ftm_last", null), tab: "list", sel: null, trip: store.get("ftm_trip", []) };
+
+/* ---- Google map (embed, no key needed) ---- */
+// Google resolves place names to the real business; raw coordinates show street addresses instead.
+const loc = (p, city) => p.query || [p.name, p.neighborhood && /[a-z]/i.test(p.neighborhood) ? p.neighborhood : "", p.city || city].filter(Boolean).join(", ") || `${p.lat},${p.lng}`;
+const label = (p, city) => [p.name, city].filter(Boolean).join(", ");
+function embedAll(places, city){
+  const pts = places.slice(0, 10);
+  if (!pts.length) return "about:blank";
+  if (pts.length === 1) return embedOne(pts[0], city);
+  const [first, ...rest] = pts;
+  return `https://maps.google.com/maps?output=embed&hl=he&saddr=${encodeURIComponent(loc(first, city))}&daddr=${rest.map(p => encodeURIComponent(loc(p, city))).join("+to:")}`;
+}
+function embedOne(p, city){
+  return `https://maps.google.com/maps?output=embed&hl=he&z=16&q=${encodeURIComponent(label(p, city))}${isFinite(p.lat)&&p.lat?`&ll=${p.lat},${p.lng}`:""}`;
+}
+const openOne = (p, city) => p.mapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(label(p, city))}`;
+function openRoute(places, city){
+  const q = places.slice(0, 10).map(p => encodeURIComponent(loc(p, city)));
+  if (q.length < 2) return places[0] ? openOne(places[0], city) : "#";
+  let u = `https://www.google.com/maps/dir/?api=1&travelmode=walking&origin=${q[0]}&destination=${q[q.length-1]}`;
+  if (q.length > 2) u += `&waypoints=${q.slice(1,-1).join("%7C")}`;
+  return u;
+}
+
+/* ---- scanning ---- */
+function setStatus(t, err){ $("#status").textContent = t; $("#status").classList.toggle("err", !!err); }
+const extractUrl = s => (String(s||"").match(/https?:\/\/[^\s"'<>]+/) || [""])[0];
+
+async function scan(raw){
+  const url = extractUrl(raw);
+  if (!url) { setStatus("לא מצאתי קישור. הדבק קישור שמתחיל ב־https://", true); return; }
+  $("#url").value = url;
+  $("#go").disabled = true; $("#bar").hidden = false; $("#setup").innerHTML = "";
+  setStatus("קורא את הסרטון ומאתר את המקומות… (10–40 שניות)");
+  try {
+    const r = await fetch(API, { method:"POST", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${ANON}`, apikey: ANON }, body: JSON.stringify({ url, pin: store.get("ftm_pin", "") }) });
+    const j = await r.json().catch(() => ({}));
+    if (r.status === 401) { $("#pinForm").hidden = false; $("#pin").focus(); setStatus("הזן את קוד הגישה האישי שלך כדי לסרוק.", true); state.pendingUrl = url; return; }
+    if (!r.ok) {
+      setStatus(j.message || "השרת לא הצליח לעבד את הסרטון.", true);
+      if (j.needs === "APIFY_TOKEN") $("#setup").innerHTML = `<div class="setup"><b>חסר שלב הגדרה:</b> טיקטוק מסתיר את הכיתוב משרתים בענן. צריך להוסיף מפתח Apify לשרת, ואז הקישור לבד יספיק.</div>`;
+      return;
+    }
+    if (!j.places?.length) { setStatus("קראתי את הסרטון אבל לא מצאתי בו שמות של מקומות.", true); return; }
+    state.res = j; state.sel = null; state.tab = "list";
+    store.set("ftm_last", j);
+    setStatus(`נמצאו ${j.places.length} מקומות.`);
+    render();
+  } catch {
+    setStatus("אין חיבור לשרת. בדוק את האינטרנט ונסה שוב.", true);
+  } finally { $("#go").disabled = false; $("#bar").hidden = true; }
+}
+$("#form").addEventListener("submit", e => { e.preventDefault(); scan($("#url").value); });
+$("#pinForm").addEventListener("submit", e => { e.preventDefault(); store.set("ftm_pin", $("#pin").value.trim()); $("#pinForm").hidden = true; $("#pin").value = ""; if (state.pendingUrl) scan(state.pendingUrl); });
+$("#paste").onclick = async () => { try { const t = await navigator.clipboard.readText(); $("#url").value = extractUrl(t) || t; if (extractUrl(t)) scan(t); } catch { $("#url").focus(); setStatus("הדבק את הקישור בשדה (לחיצה ארוכה ← הדבק)."); } };
+
+/* ---- trip list ---- */
+const key = p => (p.name + "|" + (p.city||"")).toLowerCase();
+const inTrip = p => state.trip.some(t => key(t) === key(p));
+function toggleTrip(p){
+  state.trip = inTrip(p) ? state.trip.filter(t => key(t) !== key(p)) : [...state.trip, p];
+  store.set("ftm_trip", state.trip); render();
+}
+
+/* ---- render ---- */
+function placeHTML(p, i, city){
+  const q = {...p, city: p.city || city};
+  return `<li class="place ${state.sel===i?"sel":""}" data-i="${i}">
+    <div class="num">${i+1}</div><div class="body">
+      <h3>${esc(p.name)}</h3>${p.local && p.local!==p.name?`<div class="local">${esc(p.local)}</div>`:""}
+      <div class="meta">${p.category?`<span class="chip">${esc(p.category)}</span>`:""}${p.neighborhood?`<span>${esc(p.neighborhood)}</span>`:""}${p.price?`<span>${esc(p.price)}</span>`:""}${!(p.lat)?`<span class="chip warn">מיקום לא אומת</span>`:""}</div>
+      ${p.why?`<p>${esc(p.why)}</p>`:""}${p.dish?`<div class="sub">להזמין: ${esc(p.dish)}</div>`:""}
+      ${p.rating?`<div class="score">★ ${(+p.rating).toFixed(1)} <small>גוגל · ${p.ratingCount||0} ביקורות</small></div>`:""}
+      ${p.address?`<div class="sub">${esc(p.address.split(",").slice(0,3).join(","))}</div>`:""}
+      <div class="row"><a class="btn small" href="${openOne(p, city)}" target="_blank" rel="noopener" data-stop>גוגל מפות</a>
+        <button class="small" data-trip="${i}" data-stop>${inTrip(q)?"✓ בטיול":"+ לטיול"}</button></div>
+    </div></li>`;
+}
+
+function render(){
+  const r = state.res;
+  if (!r) { $("#card").hidden = true; $("#tabs").hidden = true; $("#panel").innerHTML = `<div class="empty">הדבק קישור לסרטון על אוכל או טיול, ותקבל את המקומות על מפת גוגל.</div>`; return; }
+  const onTrip = state.tab === "trip";
+  const places = onTrip ? state.trip : r.places;
+  const city = onTrip ? "" : (r.city || "");
+  $("#card").hidden = false; $("#tabs").hidden = false;
+  $("#title").textContent = onTrip ? "הטיול שלי" : (r.title || "תוצאות");
+  $("#meta").innerHTML = onTrip ? `<span>${state.trip.length} מקומות מכל הסרטונים</span>` :
+    `${r.source?.author?`<span>${esc(r.source.author)}</span><span>·</span>`:""}<span>${esc([r.city,r.country].filter(Boolean).join(", "))}</span>${r.mode==="simple"?`<span class="chip warn">חילוץ בסיסי</span>`:""}${r.source?.url?`<a class="sub" href="${esc(r.source.url)}" target="_blank" rel="noopener">לסרטון</a>`:""}`;
+
+  const sel = state.sel != null ? places[state.sel] : null;
+  const src = sel ? embedOne(sel, sel.city || city) : embedAll(places, city);
+  if ($("#gmap").dataset.src !== src) { $("#gmap").src = src; $("#gmap").dataset.src = src; }
+  $("#mapLabel").textContent = sel ? `${state.sel+1}. ${sel.name}` : (places.length > 1 ? "כל המקומות, לפי סדר המסלול" : "");
+  $("#showAll").hidden = !sel;
+  $("#openG").href = sel ? openOne(sel, sel.city || city) : openRoute(places, city);
+
+  const tabs = [["list","רשימה",r.places.length],["route","מסלול",r.itinerary?.length||0],["trip","הטיול שלי",state.trip.length]];
+  $("#tabs").innerHTML = tabs.map(([k,l,c]) => `<button role="tab" aria-selected="${state.tab===k}" data-tab="${k}">${l} <span class="count">${c}</span></button>`).join("");
+
+  let html = "";
+  if (state.tab === "list" || onTrip) {
+    html = places.length ? `<div class="row" style="margin-bottom:10px">${onTrip?"":`<button class="small" id="addAll">+ הוסף הכל לטיול</button>`}</div><ul class="list">${places.map((p,i)=>placeHTML(p,i,p.city||city)).join("")}</ul>`
+      : `<div class="empty">עוד לא שמרת מקומות. לחץ "+ לטיול" ליד מקום, והרשימה תצטבר כאן מכל הסרטונים.</div>`;
+  } else {
+    const byId = Object.fromEntries(r.places.map((p,i)=>[p.id,{p,i}]));
+    html = (r.itinerary||[]).length ? (r.itinerary).map(d => {
+      const st = (d.stops||[]).map(s=>({...s,o:byId[s.id]})).filter(s=>s.o);
+      return `<div class="day"><div class="row" style="justify-content:space-between"><h3>יום ${esc(d.day)} · ${esc(d.title||"")}</h3><a class="btn small" target="_blank" rel="noopener" href="${openRoute(st.map(s=>s.o.p), city)}">ניווט ביום הזה</a></div>
+        <ol class="stops">${st.map(s=>`<li><span class="t">${esc(s.slot||"")}</span><span><b>${s.o.i+1}. ${esc(s.o.p.name)}</b></span></li>`).join("")}</ol></div>`;
+    }).join("") : `<div class="empty">אין מסלול לסרטון הזה. המסלול נבנה אוטומטית כשהחילוץ החכם פעיל.</div>`;
+  }
+  $("#panel").innerHTML = html;
+}
+
+document.addEventListener("click", e => {
+  const t = e.target.closest("[data-tab],[data-trip],.place,#addAll,#showAll");
+  if (!t) return;
+  if (t.matches("[data-tab]")) { state.tab = t.dataset.tab; state.sel = null; render(); return; }
+  if (t.id === "showAll") { state.sel = null; render(); return; }
+  if (t.id === "addAll") { state.res.places.forEach(p => { const q={...p, city:p.city||state.res.city}; if(!inTrip(q)) state.trip.push(q); }); store.set("ftm_trip", state.trip); render(); return; }
+  if (t.matches("[data-trip]")) { const list = state.tab==="trip" ? state.trip : state.res.places; const p = list[+t.dataset.trip]; toggleTrip(state.tab==="trip" ? p : {...p, city:p.city||state.res.city}); return; }
+  if (t.matches(".place") && !e.target.closest("[data-stop]")) { const i = +t.dataset.i; state.sel = state.sel === i ? null : i; render(); $(".map").scrollIntoView({behavior:"smooth", block:"nearest"}); }
+});
+
+/* shared from another app, or opened with ?url= */
+const qs = new URLSearchParams(location.search);
+const shared = qs.get("url") || qs.get("text") || qs.get("title");
+render();
+if (extractUrl(shared)) { history.replaceState(null, "", location.pathname); scan(shared); }
+</script>
+</body>
+</html>
