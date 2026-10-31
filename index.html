@@ -82,15 +82,29 @@ button:disabled{opacity:.55;cursor:default}
 .newf label{font-size:12px;font-weight:600;color:var(--muted)}
 .daysbar{justify-content:space-between;margin-bottom:10px}
 .sec{font-family:var(--f-display);font-size:24px;line-height:1;margin:14px 0 8px}
-.primary-link{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.primary-link{background:var(--pin);color:var(--pin-ink);border-color:var(--pin)}
+.day .primary-link{background:var(--ink);color:var(--paper);border-color:var(--ink)}
 #panel .day+.day{margin-top:10px}
+.feedbar{display:flex;flex-direction:column;gap:8px}
+.feedhead{display:flex;align-items:baseline;justify-content:space-between}
+.vids{list-style:none;margin:0;padding:0 0 4px;display:flex;gap:8px;overflow-x:auto;scroll-snap-type:x proximity}
+.vid{flex:0 0 220px;display:flex;align-items:stretch;background:var(--surface);border:1px solid var(--line);border-radius:14px;scroll-snap-align:start;overflow:hidden}
+.vid.on{border-color:var(--pin);box-shadow:0 0 0 1px var(--pin)}
+.vbtn{flex:1;min-width:0;border:0;border-radius:0;background:transparent;flex-direction:column;align-items:flex-start;gap:2px;padding:10px 12px;text-align:right;white-space:normal}
+.vt{font-weight:600;font-size:14px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.vdel{border:0;border-right:1px solid var(--line);border-radius:0;background:transparent;color:var(--muted);padding:0 12px}
+.vdel:hover{color:var(--pin)}
+.savebar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:var(--surface);border:1.5px solid var(--pin);border-radius:14px;padding:12px 14px;margin-bottom:12px}
+.save-all{background:var(--pin);border-color:var(--pin);color:var(--pin-ink);min-height:44px;font-weight:600}
+.chip.ok{background:var(--soft);color:var(--route);font-weight:600;align-self:center}
+.ghost{background:transparent;color:var(--muted)}
 .reset{margin-top:28px;display:flex;flex-direction:column;align-items:flex-start;gap:10px}
 .danger{background:var(--pin);color:var(--pin-ink);border-color:var(--pin)}
 </style>
 </head>
 <body>
 <main class="app">
-  <header class="brand"><h1>מהפיד <span>למפה</span></h1><span class="count" id="ver">v0.5</span></header>
+  <header class="brand"><h1>מהפיד <span>למפה</span></h1><span class="count" id="ver">v0.6</span></header>
 
   <form class="scan" id="form">
     <input id="url" type="url" inputmode="url" placeholder="הדבק קישור מטיקטוק או אינסטגרם" aria-label="קישור לסרטון" required>
@@ -105,6 +119,7 @@ button:disabled{opacity:.55;cursor:default}
     <button class="primary" type="submit">שמור</button>
   </form>
 
+  <section class="feedbar" id="feedBar" hidden aria-label="הפיד שלי"></section>
   <section class="card" id="card" hidden>
     <div class="head">
       <div class="meta" id="meta"></div>
@@ -185,11 +200,12 @@ async function scan(raw){
       return;
     }
     if (!j.places?.length) { setStatus("קראתי את הסרטון אבל לא מצאתי בו שמות של מקומות.", true); return; }
+    j.key = vidKey(j);
+    state.feed = [j, ...state.feed.filter(v => v.key !== j.key)];
+    saveFeed();
     state.res = j; state.sel = null; state.tab = "list"; state.folder = null; delete state.days.v;
-    store.set("ftm_last", j);
-    setStatus(`נמצאו ${j.places.length} מקומות. לאיזו תיקייה להעביר אותם?`);
+    setStatus(`נמצאו ${j.places.length} מקומות. שמור אותם בתיקייה, או מחק את מה שלא מעניין אותך.`);
     render();
-    openPicker(j.places);
   } catch {
     setStatus("אין חיבור לשרת. בדוק את האינטרנט ונסה שוב.", true);
   } finally { $("#go").disabled = false; $("#bar").hidden = true; }
@@ -208,7 +224,17 @@ function loadFolders(){
   }
   return f;
 }
-let state = { res: store.get("ftm_last", null), tab: "list", sel: null, folders: loadFolders(), folder: null, days: {}, pick: null };
+// The feed keeps every scanned video until the user deletes it.
+function loadFeed(){
+  let f = store.get("ftm_feed", null);
+  if (!f) { const last = store.get("ftm_last", null); f = last ? [last] : []; }
+  f.forEach(v => { v.key = v.key || vidKey(v); });
+  return f;
+}
+const vidKey = v => (v.source?.url || v.title || "").replace(/\?.*$/, "");
+const saveFeed = () => store.set("ftm_feed", state.feed);
+let state = { feed: [], res: null, tab: "list", sel: null, folders: loadFolders(), folder: null, days: {}, pick: null };
+state.feed = loadFeed(); state.res = state.feed[0] || null;
 const saveFolders = () => store.set("ftm_folders", state.folders);
 
 const COUNTRY_HE = { Japan:"יפן", "Czech Republic":"צ׳כיה", Czechia:"צ׳כיה", Portugal:"פורטוגל", Italy:"איטליה", France:"צרפת", Spain:"ספרד", Greece:"יוון", Thailand:"תאילנד", "United Kingdom":"אנגליה", UK:"אנגליה", England:"אנגליה", Germany:"גרמניה", Netherlands:"הולנד", Hungary:"הונגריה", Austria:"אוסטריה", "United States":"ארה״ב", USA:"ארה״ב", Israel:"ישראל", "United Arab Emirates":"איחוד האמירויות", UAE:"איחוד האמירויות", Turkey:"טורקיה", Türkiye:"טורקיה", "South Korea":"קוריאה", Georgia:"גאורגיה", Cyprus:"קפריסין", Poland:"פולין", Romania:"רומניה", Croatia:"קרואטיה", Montenegro:"מונטנגרו", Vietnam:"וייטנאם", India:"הודו", Mexico:"מקסיקו" };
@@ -229,20 +255,22 @@ function addToFolder(id){
   let added = 0;
   state.pick.forEach(p => { if (!f.places.some(t => key(t) === key(p))) { f.places.push(p); added++; } });
   saveFolders();
-  const moved = new Set(state.pick.map(key));
   state.pick = null; renderSheet();
-  removeFromFeed(p => moved.has(key(withCity(p))));
-  setStatus(added ? `הועברו ${added} מקומות לתיקייה "${f.name}".` : `המקומות כבר היו בתיקייה "${f.name}", והוסרו מהפיד.`);
-  if (!state.res) { state.tab = "folders"; state.folder = f.id; state.sel = null; }
+  setStatus(added ? `נשמרו ${added} מקומות בתיקייה "${f.name}". הם נשארים גם בפיד.` : `המקומות כבר נמצאים בתיקייה "${f.name}".`);
   render();
 }
-// The feed holds only places not yet filed in a folder.
+// Deleting from the feed never touches folders.
 function removeFromFeed(test){
   if (!state.res) return;
   state.res.places = state.res.places.filter(p => !test(p));
   state.sel = null;
-  if (!state.res.places.length) { state.res = null; try { localStorage.removeItem("ftm_last"); } catch {} }
-  else store.set("ftm_last", state.res);
+  if (!state.res.places.length) removeVideo(state.res);
+  else saveFeed();
+}
+function removeVideo(v){
+  state.feed = state.feed.filter(x => x !== v);
+  saveFeed();
+  state.res = state.feed[0] || null; state.sel = null; delete state.days.v;
 }
 function renderSheet(){
   const el = $("#sheet");
@@ -312,11 +340,23 @@ function placeHTML(p, i, city, inFolder){
       ${p.rating?`<div class="score">★ ${(+p.rating).toFixed(1)} <small>גוגל · ${p.ratingCount||0} ביקורות</small></div>`:""}
       ${p.address?`<div class="sub">${esc(p.address.split(",").slice(0,3).join(","))}</div>`:""}
       <div class="row"><a class="btn small" href="${openOne(p, city)}" target="_blank" rel="noopener" data-stop>גוגל מפות</a>
-        ${inFolder ? `<button class="small" data-remove="${i}" data-stop>מחק</button>` : `<button class="small" data-save="${i}" data-stop>${f ? "✓ ב" + esc(f.name) : "העבר לתיקייה"}</button><button class="small" data-del="${i}" data-stop>מחק</button>`}</div>
+        ${inFolder ? `<button class="small" data-remove="${i}" data-stop>מחק</button>` : `${f ? `<span class="chip ok">✓ ${esc(f.name)}</span>` : ""}<button class="small ${f ? "" : "primary-link"}" data-save="${i}" data-stop>${f ? "+ לתיקייה נוספת" : "+ לתיקייה"}</button><button class="small ghost" data-del="${i}" data-stop aria-label="מחק את ${esc(p.name)} מהפיד">מחק</button>`}</div>
     </div></li>`;
 }
 
+function renderFeedBar(){
+  const el = $("#feedBar");
+  el.hidden = !state.feed.length;
+  if (!state.feed.length) { el.innerHTML = ""; return; }
+  el.innerHTML = `<div class="feedhead"><b>הפיד שלי</b><span class="sub">${state.feed.length} סרטונים</span></div>
+    <ul class="vids">${state.feed.map(v => {
+      const on = v === state.res && state.tab !== "folders";
+      return `<li class="vid ${on ? "on" : ""}"><button class="vbtn" data-video="${esc(v.key)}" aria-current="${on}"><span class="vt">${esc(cleanTitle(v.title))}</span><span class="sub">${esc(v.source?.author || "")}${v.city ? " · " + esc(v.city) : ""} · ${v.places.length} מקומות</span></button><button class="vdel" data-delvideo="${esc(v.key)}" aria-label="מחק את הסרטון מהפיד">✕</button></li>`;
+    }).join("")}</ul>`;
+}
+
 function render(){
+  renderFeedBar();
   const r = state.res;
   const onFolders = state.tab === "folders";
   const folder = onFolders ? state.folders.find(f => f.id === state.folder) : null;
@@ -359,7 +399,10 @@ function render(){
       ? `<h3 class="sec">מסלול</h3>${routeHTML("f:" + folder.id, places, null, city)}<h3 class="sec">המקומות בתיקייה</h3><ul class="list">${places.map((p,i)=>placeHTML(p,i,p.city,true)).join("")}</ul>`
       : `<div class="empty">התיקייה ריקה.</div>`);
   } else if (state.tab === "list") {
-    html = `<div class="row" style="margin-bottom:10px"><button class="small primary-link" id="addAll">העבר הכל לתיקייה</button><button class="small" id="clearFeed">נקה את הפיד</button></div><ul class="list">${places.map((p,i)=>placeHTML(p,i,city,false)).join("")}</ul>`;
+    const savedN = places.filter(p => folderOf(withCity(p))).length;
+    html = `<div class="savebar"><div><b>${savedN === places.length ? "כל המקומות שמורים בתיקיות" : `${places.length - savedN} מקומות עוד לא בתיקייה`}</b><div class="sub">שמירה לתיקייה לא מוחקת מהפיד</div></div>
+      <button class="primary-link save-all" id="addAll">+ שמור הכל לתיקייה</button></div>
+      <ul class="list">${places.map((p,i)=>placeHTML(p,i,city,false)).join("")}</ul>`;
   } else {
     html = routeHTML("v", places, r.itinerary, city);
   }
@@ -372,7 +415,7 @@ function renderTabs(r){
 }
 
 document.addEventListener("click", e => {
-  const t = e.target.closest("[data-tab],[data-save],[data-remove],[data-del],[data-folder],[data-pick],[data-days],.place,#addAll,#clearFeed,#showAll,#backFolders,#delFolderAsk,#delFolderYes,#delFolderNo,#sheetClose,#sheet");
+  const t = e.target.closest("[data-tab],[data-save],[data-remove],[data-del],[data-folder],[data-pick],[data-days],.place,#addAll,[data-video],[data-delvideo],#showAll,#backFolders,#delFolderAsk,#delFolderYes,#delFolderNo,#sheetClose,#sheet");
   if (!t) return;
   if (t.id === "sheet") { if (e.target === t) { state.pick = null; renderSheet(); } return; }
   if (t.id === "sheetClose") { state.pick = null; renderSheet(); return; }
@@ -384,7 +427,8 @@ document.addEventListener("click", e => {
   if (t.id === "addAll") { openPicker(state.res.places); return; }
   if (t.matches("[data-save]")) { openPicker([state.res.places[+t.dataset.save]]); return; }
   if (t.matches("[data-del]")) { const p = state.res.places[+t.dataset.del]; removeFromFeed(x => x === p); setStatus(`"${p.name}" נמחק מהפיד.`); render(); return; }
-  if (t.id === "clearFeed") { removeFromFeed(() => true); setStatus("הפיד נוקה."); render(); return; }
+  if (t.matches("[data-video]")) { state.res = state.feed.find(v => v.key === t.dataset.video) || null; state.tab = "list"; state.sel = null; state.folder = null; delete state.days.v; render(); return; }
+  if (t.matches("[data-delvideo]")) { const v = state.feed.find(x => x.key === t.dataset.delvideo); if (v) { removeVideo(v); setStatus(`הסרטון "${cleanTitle(v.title)}" נמחק מהפיד.`); } render(); return; }
   if (t.id === "delFolderAsk") { $("#delFolderConfirm").hidden = false; return; }
   if (t.id === "delFolderNo") { $("#delFolderConfirm").hidden = true; return; }
   if (t.id === "delFolderYes") { const f = state.folders.find(x => x.id === state.folder); state.folders = state.folders.filter(x => x !== f); saveFolders(); state.folder = null; state.sel = null; setStatus(`התיקייה "${f.name}" נמחקה.`); render(); return; }
@@ -404,7 +448,7 @@ $("#resetAsk").onclick = () => { $("#resetConfirm").hidden = false; $("#resetAsk
 $("#resetNo").onclick = () => { $("#resetConfirm").hidden = true; $("#resetAsk").hidden = false; };
 $("#resetYes").onclick = () => {
   try { Object.keys(localStorage).filter(k => k.startsWith("ftm_")).forEach(k => localStorage.removeItem(k)); } catch {}
-  state = { res: null, tab: "list", sel: null, folders: [], folder: null, days: {}, pick: null };
+  state = { feed: [], res: null, tab: "list", sel: null, folders: [], folder: null, days: {}, pick: null };
   $("#url").value = ""; $("#gmap").removeAttribute("src"); delete $("#gmap").dataset.src;
   $("#resetConfirm").hidden = true; $("#resetAsk").hidden = false;
   setStatus("האפליקציה אופסה. אפשר להתחיל מחדש.");
