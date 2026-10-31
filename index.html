@@ -109,7 +109,7 @@ button:disabled{opacity:.55;cursor:default}
 </head>
 <body>
 <main class="app">
-  <header class="brand"><h1>מהפיד <span>למפה</span></h1><span class="count" id="ver">v0.7.1</span></header>
+  <header class="brand"><h1>מהפיד <span>למפה</span></h1><span class="count" id="ver">v0.7.2</span></header>
 
   <form class="scan" id="form">
     <input id="url" type="url" inputmode="url" placeholder="הדבק קישור מטיקטוק או אינסטגרם" aria-label="קישור לסרטון" required>
@@ -407,7 +407,7 @@ const kmBetween = (a, b) => { const R = 6371, dLat = (b[1]-a[1])*Math.PI/180, dL
 async function photon(q, center, limit = 5){
   const u = `https://photon.komoot.io/api/?limit=${limit}&q=${encodeURIComponent(q)}${center ? `&lon=${center[0]}&lat=${center[1]}&zoom=12` : ""}`;
   for (let i = 0; i < 3; i++) {
-    try { const r = await fetch(u); if (r.ok) return (await r.json()).features || []; } catch {}
+    try { const r = await fetch(u, { signal: AbortSignal.timeout(6000) }); if (r.ok) return (await r.json()).features || []; } catch {}
     await new Promise(res => setTimeout(res, 600 * (i + 1)));
   }
   return null;
