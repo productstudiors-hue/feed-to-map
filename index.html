@@ -121,7 +121,7 @@ button:disabled{opacity:.55;cursor:default}
 </head>
 <body>
 <main class="app">
-  <header class="brand"><h1>מהפיד <span>למפה</span></h1><span class="count" id="ver">v1.1</span></header>
+  <header class="brand"><h1>מהפיד <span>למפה</span></h1><span class="count" id="ver">v1.2</span></header>
 
   <form class="scan" id="form">
     <input id="url" type="url" inputmode="url" placeholder="הדבק קישור מטיקטוק או אינסטגרם" aria-label="קישור לסרטון" required>
@@ -434,6 +434,7 @@ async function photon(q, center, limit = 5){
   }
   return null;
 }
+const geoRadius = city => (HE_CITY[city] || ["Tel Aviv", "Jerusalem"].includes(city)) ? 30 : 120;
 async function cityCenter(city){
   const cache = store.get("ftm_cities", {});
   if (cache[city]) return cache[city];
@@ -450,7 +451,7 @@ async function locateOne(p, city, center){
   const hit = feats.find(f => {
     const pr = f.properties || {};
     if (["city","town","country","state"].includes(pr.osm_value)) return false;
-    if (kmBetween(center, f.geometry.coordinates) > 30) return false;
+    if (kmBetween(center, f.geometry.coordinates) > geoRadius(city)) return false;
     return sameName(want, new Set(toks([pr.name, pr.locality, pr.district].filter(Boolean).join(" "))));
   });
   if (!hit) return "none";
@@ -487,11 +488,11 @@ async function wiki(lang, params){
   try { const r = await fetch(u, { signal: AbortSignal.timeout(6000) }); if (r.ok) return Object.values((await r.json()).query?.pages || {}).sort((a, b) => (a.index ?? 0) - (b.index ?? 0)); } catch {}
   return null;
 }
-function goodPage(pg, center){
+function goodPage(pg, center, km = 30){
   if (!pg || pg.missing !== undefined || !pg.thumbnail?.source) return false;
   const c = pg.coordinates?.[0];
   if (!c) return false;
-  return !!center && kmBetween(center, [c.lon, c.lat]) < 30;
+  return !!center && kmBetween(center, [c.lon, c.lat]) < km;
 }
 const HE_CITY = { Tokyo:"טוקיו", Kyoto:"קיוטו", Osaka:"אוסקה", Lisbon:"ליסבון", Porto:"פורטו", Paris:"פריז", Rome:"רומא", Milan:"מילאנו", London:"לונדון", Berlin:"ברלין", Amsterdam:"אמסטרדם", Barcelona:"ברצלונה", Madrid:"מדריד", Athens:"אתונה", Bangkok:"בנגקוק", Dubai:"דובאי", Prague:"פראג", Budapest:"בודפשט", "New York":"ניו יורק", Vienna:"וינה", Seoul:"סיאול", Istanbul:"איסטנבול", Naples:"נאפולי", Florence:"פירנצה" };
 async function findPhoto(p, city){
@@ -505,12 +506,12 @@ async function findPhoto(p, city){
   if (exact === null) return "retry";
   // A one-word name that Wikipedia redirects elsewhere ("Damaso" -> a church) is too risky to trust.
   const oneWord = toks(p.name).length < 2;
-  let pg = exact.find(x => goodPage(x, center) && (!oneWord || norm(x.title).trim().startsWith(norm(name).trim())));
+  let pg = exact.find(x => goodPage(x, center, geoRadius(city)) && (!oneWord || norm(x.title).trim().startsWith(norm(name).trim())));
   if (!pg) {
     const found = await wiki(lang, `generator=search&gsrlimit=5&gsrsearch=${encodeURIComponent(name + (cityWord ? " " + cityWord : ""))}`);
     if (found === null) return "retry";
     const want = toks(p.name);
-    pg = found.find(x => goodPage(x, center) && want.length && sameName(want, new Set(toks(x.title))));
+    pg = found.find(x => goodPage(x, center, geoRadius(city)) && want.length && sameName(want, new Set(toks(x.title))));
   }
   if (!pg) return "none";
   p.img = pg.thumbnail.source;
@@ -670,10 +671,13 @@ async function ocrImages(images, onProgress){
   return [...lines];
 }
 // Everyday words that show up on screen but are never a place name by themselves.
-const OCR_STOP = new Set("love best food pasta pizza gelato coffee top must day night part follow like likes save share comment comments link bio tiktok instagram reels video travel trip guide tips cheap free open close closed price prices menu here there this that what where when best new old city center centre street day1 day2 day3 euro eur שמרו שתפו עקבו לייק תגיות קישור".split(" "));
+const OCR_STOP = new Set("instagram instaguam bucket list part coming soon stay love best food pasta pizza gelato coffee top must day night part follow like likes save share comment comments link bio tiktok instagram reels video travel trip guide tips cheap free open close closed price prices menu here there this that what where when best new old city center centre street day1 day2 day3 euro eur שמרו שתפו עקבו לייק תגיות קישור".split(" "));
 function ocrCandidates(lines){
   const out = new Map();
   for (const raw of lines) for (let part of raw.split(/[|•·,;:📍]|\s[-–—]\s/u)) {
+    // a Latin line with a stray Hebrew letter or two is OCR noise around the text: keep the Latin part
+    if (/[A-Za-zÀ-ÿ]{3}/.test(part) && !/[֐-׿]{3}/.test(part)) part = part.replace(/[֐-׿]+/g, " ");
+    part = part.replace(/^\s*(?:stay|visit|go|try|eat|sleep|drink)?\s*(?:in|at|to|on|near|from|the|a|an)?\s*(?:a|an|the)?\s+(?=[A-Za-zÀ-ÿ])/i, "");
     part = part.replace(/^[\d\s.)\-–#@]+/, "").replace(/[^\p{L}\p{N}'’&.\- ]/gu, " ").replace(/\s+/g, " ").trim();
     if (part.length < 3 || part.length > 40 || part.split(" ").length > 5) continue;
     if ((part.match(/\p{L}/gu) || []).length / part.length < 0.7) continue;
@@ -686,7 +690,12 @@ function ocrCandidates(lines){
   }
   return [...out.values()].slice(0, 40);
 }
+const COUNTRIES_EN = "Indonesia|Italy|France|Spain|Portugal|Greece|Japan|Thailand|Vietnam|Czechia|Czech Republic|Germany|Austria|Hungary|Netherlands|United Kingdom|England|Croatia|Turkey|Mexico|Peru|USA|United States|Israel|Georgia|Cyprus|Montenegro|Albania|Switzerland|Morocco|Sri Lanka|India|Philippines|Malaysia|South Korea|China|Australia|Iceland|Norway";
+const REGIONS = { "באלי":"Bali", "טוסקנה":"Tuscany", "סנטוריני":"Santorini", "פוקט":"Phuket", "אמלפי":"Amalfi", "סרדיניה":"Sardinia", "סיציליה":"Sicily", "קפריסין":"Cyprus", "מדיירה":"Madeira", "כרתים":"Crete", "גאורגיה":"Georgia", "טביליסי":"Tbilisi" };
 function cityFromText(text){
+  const tag = text.match(new RegExp(`([A-Z][A-Za-zÀ-ÿ'’.\\- ]{2,30}),\\s*(?:${COUNTRIES_EN})\\b`));
+  if (tag) return tag[1].trim();
+  for (const [he, en] of Object.entries(REGIONS)) if (text.includes(he) || new RegExp(`\\b${en}\\b`, "i").test(text)) return en;
   for (const [en, he] of Object.entries(HE_CITY)) if (text.includes(he) || new RegExp(`\\b${en}\\b`, "i").test(text)) return en;
   if (/\bRoma\b/i.test(text)) return "Rome";
   return "";
