@@ -44,6 +44,10 @@ button:disabled{opacity:.55;cursor:default}
 .head h2{font-family:var(--f-display);font-size:32px;line-height:1.05}
 .meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--muted)}
 .chip{font-size:11px;font-weight:500;padding:2px 8px;border-radius:99px;background:var(--soft);color:var(--ink)}
+.cat-sel{font:inherit;font-size:12px;font-weight:600;padding:2px 6px;border-radius:99px;border:1px solid var(--line);background:var(--surface);color:var(--ink);max-width:160px}
+.catbar{display:flex;gap:6px;overflow-x:auto;padding:2px 0 10px;scrollbar-width:none}
+.catbar button{flex:0 0 auto;font-size:13px;padding:6px 12px;border-radius:99px;border:1px solid var(--line);background:var(--surface);color:var(--ink);white-space:nowrap}
+.catbar button[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
 .chip.warn{background:var(--warn-bg);color:var(--warn)}
 .map{position:relative;aspect-ratio:4/3.4;max-height:62vh;width:100%;background:var(--soft)}
 .map iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
@@ -121,7 +125,7 @@ button:disabled{opacity:.55;cursor:default}
 </head>
 <body>
 <main class="app">
-  <header class="brand"><h1>מהפיד <span>למפה</span></h1><span class="count" id="ver">v1.3</span></header>
+  <header class="brand"><h1>מהפיד <span>למפה</span></h1><span class="count" id="ver">v1.4</span></header>
 
   <form class="scan" id="form">
     <input id="url" type="url" inputmode="url" placeholder="הדבק קישור מטיקטוק או אינסטגרם" aria-label="קישור לסרטון" required>
@@ -388,12 +392,12 @@ function shareText(kind, title, places, city, plan){
   if (kind === "route") {
     plan.days.forEach(d => {
       lines.push(`*יום ${d.day}${d.title ? " · " + d.title : ""}*`);
-      d.stops.forEach(s => lines.push(`${places.indexOf(s.p) + 1}. ${s.p.name}${s.slot ? " (" + s.slot + ")" : ""}`));
+      d.stops.forEach(s => lines.push(`${places.indexOf(s.p) + 1}. ${CATS[catOf(s.p)].icon} ${s.p.name}${s.slot ? " (" + s.slot + ")" : ""}`));
       lines.push(`ניווט ביום הזה: ${openRoute(d.stops.map(s => s.p), city)}`, "");
     });
     if (plan.rest.length) { lines.push("*עוד מקומות (בלי מיקום מאומת)*"); plan.rest.forEach(p => lines.push(`• ${p.name}: ${mapsLink(p, city)}`)); lines.push(""); }
   } else {
-    places.forEach((p, i) => lines.push(`${i + 1}. ${p.name}${areaOf(p) ? " · " + areaOf(p) : ""}${p.why ? "\n   " + p.why : ""}\n   ${mapsLink(p, city)}`));
+    places.forEach((p, i) => lines.push(`${i + 1}. ${CATS[catOf(p)].icon} ${p.name}${areaOf(p) ? " · " + areaOf(p) : ""}${p.why ? "\n   " + p.why : ""}\n   ${mapsLink(p, city)}`));
     lines.push("");
   }
   lines.push("נשלח מ״מהפיד למפה״");
@@ -458,6 +462,7 @@ async function locateOne(p, city, center){
   const pr = hit.properties;
   p.lng = hit.geometry.coordinates[0]; p.lat = hit.geometry.coordinates[1];
   p.area = pr.locality || pr.district || pr.suburb || "";
+  p.osm = `${pr.osm_key || ""}=${pr.osm_value || ""}`;
   p.address = p.address || [pr.street && (pr.street + (pr.housenumber ? " " + pr.housenumber : "")), pr.locality || pr.district, pr.city].filter(Boolean).join(", ");
   return "ok";
 }
@@ -516,6 +521,7 @@ async function findPhoto(p, city){
   if (!pg) return "none";
   p.img = pg.thumbnail.source;
   p.imgSrc = `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(pg.title.replace(/ /g, "_"))}`;
+  p.wiki = true;
   if (!p.lat && pg.coordinates?.[0]) { p.lat = pg.coordinates[0].lat; p.lng = pg.coordinates[0].lon; }
   return "ok";
 }
@@ -757,6 +763,79 @@ async function ocrVideo(v, { silent = false } = {}){
   finally { ocrNow = false; note.hidden = true; }
 }
 
+/* ---- categories: food, café, bar, sight, museum, nature, shopping, stay ----
+   Decided from (in order): your own choice, the AI's category, the map's place type (OpenStreetMap / Google),
+   words in the name, then words in what the video said about it. */
+const CATS = {
+  food:   { label: "אוכל", icon: "🍝" },
+  cafe:   { label: "קפה ומתוקים", icon: "☕" },
+  bar:    { label: "בר ולילה", icon: "🍷" },
+  site:   { label: "אתר", icon: "🏛️" },
+  museum: { label: "מוזיאון", icon: "🖼️" },
+  nature: { label: "טבע ונוף", icon: "🌿" },
+  shop:   { label: "שווקים וקניות", icon: "🛍️" },
+  stay:   { label: "לינה", icon: "🛏️" },
+  other:  { label: "מקום", icon: "📍" },
+};
+const CAT_WORDS = {
+  museum: "museum museums musei museo musée museu muzeum gallery galleria galerie exhibition מוזיאון גלריה תערוכה",
+  cafe:   "cafe café caffè caffe coffee kaffee bakery pasticceria patisserie pâtisserie boulangerie gelato gelateria dessert desserts chocolate chocolaterie donut kurtos trdelnik bakehouse brunch קפה מאפה מאפייה גלידה קינוח קינוחים שוקו קיורטוש עוגה עוגות מתוקים מריטוצו קרואסון בראנץ'",
+  bar:    "bar pub cocktail cocktails wine enoteca vinoteca brewery beer biergarten rooftop speakeasy club בר פאב יין קוקטייל קוקטיילים בירה מבשלה",
+  food:   "restaurants מסעדות foodie eats restaurant ristorante trattoria osteria pizzeria pizza pasta sushi ramen izakaya yakiniku udon soba tempura bistro brasserie taverna tavern grill kitchen burger burgers kebab steak steakhouse deli diner noodle noodles dumplings carbonara cacio tacos street food eatery mart מסעדה מסעדת אוכל פיצה פסטה המבורגר סושי ראמן אודון יאקיניקו קציו קרבונרה דוכן ארוחה ארוחת מנה שף טעים טעימות קציצות אכלנו לאכול",
+  shop:   "market mercato markt mercado shop store boutique mall outlet bazaar שוק חנות חנויות קניות בוטיק",
+  stay:   "hotel hostel resort villa guesthouse ryokan airbnb bungalow glamping מלון אכסניה וילה לינה צימר",
+  nature: "beach park garden gardens waterfall falls lake mountain hill viewpoint view lookout volcano rice terrace terraces forest river cruise boat trek hike island sunset sunrise cliff cave חוף פארק גן מפל אגם הר גבעה תצפית נוף נהר שיט טרק טיול יער אי שקיעה זריחה מערה",
+  site:   "church chiesa basilica cathedral duomo castle castello palace palazzo bridge ponte tower torre square piazza plaza fountain fontana forum colosseum colosseo arch temple shrine monument memorial old town quarter keyhole clock wall gate synagogue mosque fortress ruins street steps truth pantheon כנסייה קתדרלה טירה ארמון גשר מגדל כיכר מזרקה שעון רובע קיר שער מקדש בית כנסת מסגד מבצר חורבות רחוב מדרגות העיר העתיקה אנדרטה",
+};
+const CAT_WORDSET = Object.fromEntries(Object.entries(CAT_WORDS).map(([k, w]) => [k, w.split(" ")]));
+const CAT_ORDER_NAME = ["museum", "cafe", "bar", "food", "shop", "stay", "nature", "site"];
+const AI_CAT = { "מסעדה":"food", "דוכן":"food", "בית קפה":"cafe", "מאפייה":"cafe", "בר":"bar", "שוק":"shop", "חנות":"shop", "אטרקציה":"site", "תצפית":"nature", "מוזיאון":"museum", "מלון":"stay", "שכונה":"site" };
+function catFromOsm(o){
+  if (!o) return "";
+  const [k, v] = o.split("=");
+  if (["restaurant","fast_food","food_court"].includes(v)) return "food";
+  if (["cafe","ice_cream","bakery","pastry","confectionery","chocolate"].includes(v)) return "cafe";
+  if (["bar","pub","biergarten","nightclub","wine","brewery"].includes(v)) return "bar";
+  if (["museum","gallery"].includes(v)) return "museum";
+  if (["hotel","hostel","guest_house","motel","apartment","chalet"].includes(v)) return "stay";
+  if (["viewpoint","park","garden","beach","waterfall","peak","nature_reserve"].includes(v) || k === "natural") return "nature";
+  if (v === "marketplace" || k === "shop") return "shop";
+  if (k === "historic" || ["attraction","artwork","monument","place_of_worship","bridge","square","fountain","castle","memorial"].includes(v)) return "site";
+  return "";
+}
+function catFromGoogle(t){
+  if (!t) return "";
+  if (/museum|art_gallery/.test(t)) return "museum";
+  if (/cafe|coffee|bakery|dessert|ice_cream|confectioner|chocolate/.test(t)) return "cafe";
+  if (/bar|pub|night_club|wine|brewery/.test(t)) return "bar";
+  if (/restaurant|food|meal|deli|diner/.test(t)) return "food";
+  if (/lodging|hotel|hostel|resort|inn|bed_and_breakfast/.test(t)) return "stay";
+  if (/park|beach|natural|garden|hiking|national_park|viewpoint/.test(t)) return "nature";
+  if (/store|shop|market|mall/.test(t)) return "shop";
+  if (/tourist_attraction|church|place_of_worship|historical|monument|landmark|cultural/.test(t)) return "site";
+  return "";
+}
+function catFromWords(text){
+  const words = new Set(norm(text).split(/\s+/).filter(Boolean));
+  const t = " " + norm(text) + " ";
+  for (const c of CAT_ORDER_NAME) if (CAT_WORDSET[c].some(w => w.includes(" ") ? t.includes(" " + norm(w) + " ") : words.has(norm(w)))) return c;
+  // Hebrew words often come with a prefix letter (במסעדה, לגשר, והשוק)
+  for (const c of CAT_ORDER_NAME) if (CAT_WORDSET[c].some(w => /[֐-׿]/.test(w) && [...words].some(x => x.length > w.length && x.length <= w.length + 2 && x.endsWith(w)))) return c;
+  return "";
+}
+function catOf(p, videoCat){
+  if (p.cat && (p.catManual || CATS[p.cat])) return p.cat;
+  return AI_CAT[p.category] || catFromGoogle(p.gtype) || catFromOsm(p.osm) || catFromWords([p.name, p.local].join(" "))
+    || (p.dish ? "food" : "") || catFromWords([p.why, p.category].join(" ")) || (p.wiki ? "site" : "") || videoCat || "other";
+}
+// Fill in categories that can be decided now; a manual choice is never overwritten.
+// A video titled "7 pasta restaurants in Rome" makes its unknown places food.
+function tagPlaces(places, title){
+  const vc = catFromWords(title || "");
+  const videoCat = ["food", "cafe", "bar", "museum"].includes(vc) ? vc : "";
+  places.forEach(p => { if (!p.catManual) p.cat = catOf({ ...p, cat: "" }, videoCat); });
+}
+
 /* ---- render ---- */
 function placeHTML(p, i, city, inFolder){
   const f = inFolder ? null : folderOf(withCity(p));
@@ -764,7 +843,7 @@ function placeHTML(p, i, city, inFolder){
     ${p.img ? `<figure class="ph"><img src="${esc(p.img)}" alt="${esc(p.name)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.closest('figure').remove()"><figcaption><a href="${esc(p.imgSrc)}" target="_blank" rel="noopener" data-stop>${p.imgBy ? "גוגל · " + esc(p.imgBy) : "ויקיפדיה"}</a></figcaption></figure>` : ""}
     <div class="num">${i+1}</div><div class="body">
       <h3>${esc(p.name)}</h3>${p.local && p.local!==p.name?`<div class="local">${esc(p.local)}</div>`:""}
-      <div class="meta">${p.from === "speech" || p.from === "screen" ? `<span class="chip vid-chip">${p.from === "speech" ? "נאמר בסרטון" : "הופיע על המסך"}</span>` : ""}${p.category && p.category !== "מקום"?`<span class="chip">${esc(p.category)}</span>`:""}${inFolder && p.city?`<span>${esc(p.city)}</span>`:""}${areaOf(p)?`<span class="chip area-chip">${esc(areaOf(p))}</span>`:(p.neighborhood?`<span>${esc(p.neighborhood)}</span>`:"")}${p.price?`<span>${esc(p.price)}</span>`:""}</div>
+      <div class="meta">${p.from === "speech" || p.from === "screen" ? `<span class="chip vid-chip">${p.from === "speech" ? "נאמר בסרטון" : "הופיע על המסך"}</span>` : ""}<select class="cat-sel" data-cat="${i}" data-stop aria-label="קטגוריה של ${esc(p.name)}">${Object.entries(CATS).map(([k, c]) => `<option value="${k}" ${catOf(p) === k ? "selected" : ""}>${c.icon} ${c.label}</option>`).join("")}</select>${inFolder && p.city?`<span>${esc(p.city)}</span>`:""}${areaOf(p)?`<span class="chip area-chip">${esc(areaOf(p))}</span>`:(p.neighborhood?`<span>${esc(p.neighborhood)}</span>`:"")}${p.price?`<span>${esc(p.price)}</span>`:""}</div>
       ${p.why?`<p>${esc(p.why)}</p>`:""}${p.dish?`<div class="sub">להזמין: ${esc(p.dish)}</div>`:""}
       ${p.rating?`<div class="score">★ ${(+p.rating).toFixed(1)} <small>גוגל · ${p.ratingCount||0} ביקורות</small></div>`:""}
       ${p.address?`<div class="sub">${esc(p.address.split(",").slice(0,3).join(","))}</div>`:""}
@@ -806,7 +885,13 @@ function render(){
     return;
   }
 
-  const places = folder ? folder.places : r.places;
+  const allPlaces = folder ? folder.places : r.places;
+  tagPlaces(allPlaces, folder ? "" : [r.title, (r.source?.caption || "").split("\n")[0]].join(" "));
+  const present = Object.keys(CATS).filter(k => allPlaces.some(p => catOf(p) === k));
+  if (state.catFilter && !present.includes(state.catFilter)) state.catFilter = null;
+  const shown = allPlaces.map((p, i) => [p, i]).filter(([p]) => !state.catFilter || catOf(p) === state.catFilter);
+  const catbar = present.length > 1 ? `<div class="catbar" role="group" aria-label="סינון לפי קטגוריה"><button data-catf="" aria-pressed="${!state.catFilter}">הכל ${allPlaces.length}</button>${present.map(k => `<button data-catf="${k}" aria-pressed="${state.catFilter === k}">${CATS[k].icon} ${CATS[k].label} ${allPlaces.filter(p => catOf(p) === k).length}</button>`).join("")}</div>` : "";
+  const places = allPlaces;
   const city = folder ? (places[0]?.city || "") : (r.city || "");
   const mode = folder ? (places.every(p => p.lat) ? "full" : "simple") : r.mode;
   $("#card").hidden = false;
@@ -816,7 +901,8 @@ function render(){
     : `${r.source?.author?`<span>${esc(r.source.author)}</span><span>·</span>`:""}<span>${esc([r.city,r.country].filter(Boolean).join(", "))}</span>${r.mode==="simple"?`<span class="chip warn">חילוץ בסיסי</span>`:""}${r.source?.url?`<a class="sub" href="${esc(r.source.url)}" target="_blank" rel="noopener">לסרטון</a>`:""}${r.ocrFailed && !r.ocrDone ? `<button class="small" data-ocr type="button">📷 נסה שוב לקרוא את הטקסט שעל המסך</button>` : ""}${r.summary?`<p class="vsum"><b>מה נאמר בסרטון:</b> ${esc(r.summary)}</p>`:""}`;
 
   const sel = state.sel != null ? places[state.sel] : null;
-  const src = sel ? embedOne(sel, sel.city || city) : embedAll(places, city, mode);
+  const mapPlaces = state.catFilter ? shown.map(([p]) => p) : places;
+  const src = sel ? embedOne(sel, sel.city || city) : embedAll(mapPlaces, city, mode);
   if ($("#gmap").dataset.src !== src) { $("#gmap").src = src; $("#gmap").dataset.src = src; }
   $("#mapLabel").textContent = sel ? `${state.sel+1}. ${sel.name}` : (mode === "simple" ? "לחץ על מקום ברשימה כדי לראות אותו במפה" : (places.length > 1 ? "כל המקומות, לפי סדר המסלול" : ""));
   $("#showAll").hidden = !sel;
@@ -825,14 +911,14 @@ function render(){
   let html = "";
   if (folder) {
     html = `<div id="delFolderConfirm" class="setup" hidden style="margin-bottom:12px"><p style="margin:0 0 8px"><b>למחוק את התיקייה "${esc(folder.name)}" עם כל ${places.length} המקומות שבה?</b></p><div class="row"><button class="small danger" id="delFolderYes" type="button">מחק תיקייה</button><button class="small" id="delFolderNo" type="button">ביטול</button></div></div>` + (places.length
-      ? `<h3 class="sec">מסלול</h3>${routeHTML("f:" + folder.id, places, null, city, folder.name)}<h3 class="sec">המקומות בתיקייה</h3>${shareRow(shareText("list", folder.name, places, city))}<ul class="list">${places.map((p,i)=>placeHTML(p,i,p.city,true)).join("")}</ul>`
+      ? `<h3 class="sec">מסלול</h3>${routeHTML("f:" + folder.id, places, null, city, folder.name)}<h3 class="sec">המקומות בתיקייה</h3>${catbar}${shareRow(shareText("list", folder.name, shown.map(([p]) => p), city))}<ul class="list">${shown.map(([p,i])=>placeHTML(p,i,p.city,true)).join("")}</ul>`
       : `<div class="empty">התיקייה ריקה.</div>`);
   } else if (state.tab === "list") {
     const savedN = places.filter(p => folderOf(withCity(p))).length;
     html = `<div class="savebar"><div><b>${savedN === places.length ? "כל המקומות שמורים בתיקיות" : `${places.length - savedN} מקומות עוד לא בתיקייה`}</b><div class="sub">שמירה לתיקייה לא מוחקת מהפיד</div></div>
       <button class="primary-link save-all" id="addAll">+ שמור הכל לתיקייה</button></div>
-      ${shareRow(shareText("list", cleanTitle(r.title), places, city))}
-      <ul class="list">${places.map((p,i)=>placeHTML(p,i,city,false)).join("")}</ul>`;
+      ${catbar}${shareRow(shareText("list", cleanTitle(r.title), shown.map(([p]) => p), city))}
+      <ul class="list">${shown.map(([p,i])=>placeHTML(p,i,city,false)).join("")}</ul>`;
   } else {
     html = routeHTML("v", places, r.itinerary, city, cleanTitle(r.title));
   }
@@ -844,20 +930,31 @@ function renderTabs(r){
   $("#tabs").innerHTML = tabs.map(([k,l,c]) => `<button role="tab" aria-selected="${state.tab===k}" data-tab="${k}">${l} <span class="count">${c}</span></button>`).join("");
 }
 
+document.addEventListener("change", e => {
+  const t = e.target;
+  if (!t.matches("[data-cat]")) return;
+  const folder = state.tab === "folders" ? state.folders.find(f => f.id === state.folder) : null;
+  const p = (folder ? folder.places : state.res?.places || [])[+t.dataset.cat];
+  if (!p) return;
+  p.cat = t.value; p.catManual = true;
+  if (folder) saveFolders(); else saveFeed();
+  render();
+});
 document.addEventListener("click", e => {
-  const t = e.target.closest("[data-tab],[data-save],[data-remove],[data-del],[data-folder],[data-pick],[data-days],[data-share],.place,#addAll,[data-video],[data-delvideo],#showAll,#backFolders,#delFolderAsk,#delFolderYes,#delFolderNo,#sheetClose,#sheet");
+  const t = e.target.closest("[data-catf],[data-ocr],[data-tab],[data-save],[data-remove],[data-del],[data-folder],[data-pick],[data-days],[data-share],.place,#addAll,[data-video],[data-delvideo],#showAll,#backFolders,#delFolderAsk,#delFolderYes,#delFolderNo,#sheetClose,#sheet");
   if (!t) return;
   if (t.id === "sheet") { if (e.target === t) { state.pick = null; renderSheet(); } return; }
   if (t.id === "sheetClose") { state.pick = null; renderSheet(); return; }
   if (t.matches("[data-pick]")) { addToFolder(t.dataset.pick); return; }
   if (t.matches("[data-tab]")) { state.tab = t.dataset.tab; state.sel = null; if (state.tab !== "folders") state.folder = null; render(); return; }
-  if (t.matches("[data-folder]")) { state.folder = t.dataset.folder; state.sel = null; render(); locateCurrent(); return; }
+  if (t.matches("[data-catf]")) { state.catFilter = t.dataset.catf || null; state.sel = null; render(); return; }
+  if (t.matches("[data-folder]")) { state.folder = t.dataset.folder; state.sel = null; state.catFilter = null; render(); locateCurrent(); return; }
   if (t.id === "backFolders") { state.folder = null; state.sel = null; render(); return; }
   if (t.id === "showAll") { state.sel = null; render(); return; }
   if (t.id === "addAll") { openPicker(state.res.places); return; }
   if (t.matches("[data-save]")) { openPicker([state.res.places[+t.dataset.save]]); return; }
   if (t.matches("[data-del]")) { const p = state.res.places[+t.dataset.del]; removeFromFeed(x => x === p); setStatus(`"${p.name}" נמחק מהפיד.`); render(); return; }
-  if (t.matches("[data-video]")) { state.res = state.feed.find(v => v.key === t.dataset.video) || null; state.tab = "list"; state.sel = null; state.folder = null; delete state.days.v; render(); locateCurrent(); return; }
+  if (t.matches("[data-video]")) { state.res = state.feed.find(v => v.key === t.dataset.video) || null; state.tab = "list"; state.sel = null; state.catFilter = null; state.folder = null; delete state.days.v; render(); locateCurrent(); return; }
   if (t.matches("[data-delvideo]")) { const v = state.feed.find(x => x.key === t.dataset.delvideo); if (v) { removeVideo(v); setStatus(`הסרטון "${cleanTitle(v.title)}" נמחק מהפיד.`); } render(); return; }
   if (t.id === "delFolderAsk") { $("#delFolderConfirm").hidden = false; return; }
   if (t.id === "delFolderNo") { $("#delFolderConfirm").hidden = true; return; }
