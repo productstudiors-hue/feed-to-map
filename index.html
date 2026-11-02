@@ -121,13 +121,13 @@ button:disabled{opacity:.55;cursor:default}
 </head>
 <body>
 <main class="app">
-  <header class="brand"><h1>מהפיד <span>למפה</span></h1><span class="count" id="ver">v1.2</span></header>
+  <header class="brand"><h1>מהפיד <span>למפה</span></h1><span class="count" id="ver">v1.3</span></header>
 
   <form class="scan" id="form">
     <input id="url" type="url" inputmode="url" placeholder="הדבק קישור מטיקטוק או אינסטגרם" aria-label="קישור לסרטון" required>
     <button class="primary" id="go" type="submit">סרוק</button>
   </form>
-  <div class="row"><button class="small" id="paste" type="button">הדבק מהלוח</button><button class="small" id="shotBtn" type="button">📷 צילום מסך</button><input type="file" id="shotFile" accept="image/*" multiple hidden><span class="sub">או: שתף מטיקטוק ← מהפיד למפה (באנדרואיד, אחרי "הוסף למסך הבית")</span></div>
+  <div class="row"><button class="small" id="paste" type="button">הדבק מהלוח</button><span class="sub">או: שתף מטיקטוק ← מהפיד למפה (באנדרואיד, אחרי "הוסף למסך הבית")</span></div>
   <div class="bar" id="bar" hidden><i></i></div>
   <p class="status" id="status" role="status"></p>
   <div id="setup"></div>
@@ -136,10 +136,6 @@ button:disabled{opacity:.55;cursor:default}
     <button class="primary" type="submit">שמור</button>
   </form>
 
-  <form class="scan" id="cityForm" hidden>
-    <input id="cityIn" type="text" placeholder="באיזו עיר המקומות? למשל רומא או Rome" aria-label="עיר" style="direction:rtl;text-align:right;font-family:var(--f-body)">
-    <button class="primary" type="submit">המשך</button>
-  </form>
   <section class="feedbar" id="feedBar" hidden aria-label="הפיד שלי"></section>
   <p class="status" id="geoNote" hidden></p>
   <section class="card" id="card" hidden>
@@ -226,7 +222,11 @@ async function scan(raw){
       setStatus("בכיתוב אין שמות של מקומות, אז אני צופה בסרטון ומקשיב לו… (עד דקה)");
       await deepScan(j);
     }
-    if (!j.places.length) { setStatus(state.deep === false ? "קראתי את הכיתוב של הסרטון ולא מצאתי בו שמות של מקומות. כדי לחפש גם במה שנאמר בסרטון ובטקסט שעל המסך, צריך להגדיר בשרת מפתח של Gemini." : "צפיתי בסרטון וקראתי את הכיתוב, ולא מצאתי בו שמות של מקומות.", true); return; }
+    if (!j.places.length) {
+      setStatus("בכיתוב אין שמות של מקומות, אז אני קורא את הטקסט שמופיע בסרטון עצמו…");
+      await ocrVideo(j, { silent: true });
+    }
+    if (!j.places.length) { setStatus(j.ocrFailed ? "בכיתוב אין שמות של מקומות, ולא הצלחתי להוריד את הסרטון כדי לקרוא את הטקסט שבו. נסה שוב בעוד דקה." : j.ocrPartial ? "לא מצאתי שמות של מקומות בכיתוב ובתמונה הראשונה של הפוסט. מאינסטגרם אפשר לקרוא כרגע רק את התמונה הראשונה." : "קראתי את הכיתוב ואת הטקסט שבסרטון, ולא מצאתי בהם שמות של מקומות.", true); return; }
     j.key = vidKey(j);
     if (j.geocoder === "google") { state.google = true; j.places.forEach(p => p.gTried = true); } else if (j.geocoder === "device") state.google = false;
     state.feed = [j, ...state.feed.filter(v => v.key !== j.key)];
@@ -618,7 +618,7 @@ function locateCurrent(){
     const v = state.res;
     const done = () => { copyToFolders(v); saveFeed(); saveFolders(); render(); };
     // Watch the video (if Gemini is set), then Google (if its key is set); the free lookups fill only what is left.
-    deepScan(v).then(() => { done(); return googleEnrich(v.places, v.city); }).then(() => {
+    deepScan(v).then(async () => { done(); if (!v.deepTried) await ocrVideo(v); return googleEnrich(v.places, v.city); }).then(() => {
       done();
       locatePlaces(v.places, v.city, done);
       photoPlaces(v.places, v.city, done);
@@ -718,72 +718,44 @@ async function verifyCandidates(names, city, existing){
   await Promise.all([worker(), worker()]);
   return found;
 }
-async function readAndVerify(images, city, existing, say){
+async function readAndVerify(images, city, existing, say, extraText){
   say("טוען את קורא הטקסט (בפעם הראשונה זה לוקח קצת יותר)…");
   const lines = await ocrImages(images, (i, n) => say(`קורא את הטקסט שעל המסך… ${i + 1}/${n}`));
-  city ||= cityFromText(lines.join(" "));
+  city ||= cityFromText(lines.join(" ") + " " + (extraText || ""));
   return { lines, city, found: city ? (say("בודק אילו מהשמות הם מקומות אמיתיים בעיר…"), await verifyCandidates(ocrCandidates(lines), city, existing)) : null };
 }
-async function ocrVideo(v){
-  if (ocrNow) return;
+// Reads the text that appears in the post itself: frames of the video, or every picture of a photo post.
+// Runs by itself after a scan (when Gemini is not available), once per video.
+async function ocrVideo(v, { silent = false } = {}){
+  if (ocrNow || v.ocrDone || !["tiktok", "instagram"].includes(v.source?.platform)) return 0;
   ocrNow = true;
   const note = $("#geoNote"), say = t => { note.hidden = false; note.textContent = t; };
   try {
-    say("מוריד את הסרטון…");
-    const r = await fetch(API, { method:"POST", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${ANON}`, apikey: ANON }, body: JSON.stringify({ media: v.source.url, pin: store.get("ftm_pin", "") }) });
-    let images;
+    say("מוריד את הסרטון כדי לקרוא את הטקסט שעל המסך…");
+    const r = await fetch(API, { method:"POST", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${ANON}`, apikey: ANON }, body: JSON.stringify({ media: v.source.url, pin: store.get("ftm_pin", "") }), signal: AbortSignal.timeout(120000) });
+    let images, partial = false;
     if ((r.headers.get("content-type") || "").includes("video")) { const blob = await r.blob(); say("מצלם תמונות מתוך הסרטון…"); images = await videoFrames(blob); }
     else {
       const j = await r.json().catch(() => ({}));
-      if (j.type !== "photos" || !j.images?.length) { setStatus("לא הצלחתי להוריד את הסרטון מטיקטוק. נסה שוב בעוד דקה.", true); return; }
-      images = j.images;
+      if (j.type !== "photos" || !j.images?.length) { v.ocrFailed = true; return 0; }
+      images = j.images; partial = !!j.partial;
     }
-    const { lines, city, found } = await readAndVerify(images, v.city, v.places, say);
+    const { lines, city, found } = await readAndVerify(images, v.city, v.places, say, [v.title, v.source?.caption].join(" "));
     v.screenText = lines.join("\n").slice(0, 3000);
-    if (!city) { setStatus("קראתי את הטקסט שעל המסך, אבל לא הצלחתי להבין באיזו עיר מדובר.", true); return; }
+    v.ocrDone = true; v.ocrPartial = partial; delete v.ocrFailed;
+    if (!city) { if (!silent) setStatus("קראתי את הטקסט שעל המסך, אבל לא הצלחתי להבין באיזו עיר מדובר."); return 0; }
     v.city ||= city;
     found.forEach(p => v.places.push({ ...p, id: "s" + (v.places.length + 1) }));
-    v.ocrDone = true;
-    saveFeed(); render(); locateCurrent();
-    setStatus(found.length ? `נמצאו עוד ${found.length} מקומות מהטקסט שעל המסך: ${found.map(p => p.name).join(", ")}.` : `קראתי ${lines.length} שורות טקסט מהמסך, ולא מצאתי בהן מקומות חדשים.`);
-  } catch (e) { console.error(e); setStatus("קריאת הטקסט מהמסך נכשלה. נסה שוב.", true); }
+    if (!silent) {
+      saveFeed(); render(); locateCurrent();
+      const pics = images.length > 1 ? `${images.length} תמונות` : "תמונה אחת";
+      setStatus((found.length ? `נמצאו עוד ${found.length} מקומות מהטקסט שעל המסך: ${found.map(p => p.name).join(", ")}.` : `קראתי את הטקסט שעל המסך (${pics}), ולא מצאתי בו מקומות חדשים.`)
+        + (partial ? " מאינסטגרם אפשר לקרוא כרגע רק את התמונה הראשונה של הפוסט." : ""));
+    }
+    return found.length;
+  } catch (e) { console.error(e); v.ocrFailed = true; if (!silent) setStatus("קריאת הטקסט מהמסך נכשלה. אפשר לנסות שוב בכפתור.", true); return 0; }
   finally { ocrNow = false; note.hidden = true; }
 }
-const readFile = f => new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(f); });
-async function ocrShots(images, city){
-  if (ocrNow) return;
-  ocrNow = true;
-  const note = $("#geoNote"), say = t => { note.hidden = false; note.textContent = t; };
-  try {
-    const { lines, city: c, found } = await readAndVerify(images, city, [], say);
-    if (!c) { state.pendingShots = images; $("#cityForm").hidden = false; $("#cityIn").focus(); setStatus("קראתי את הצילום. באיזו עיר המקומות?"); return; }
-    if (!found.length) { setStatus(`קראתי ${lines.length} שורות טקסט מהצילום, ולא מצאתי בהן מקומות ב${HE_CITY[c] || c}.`, true); return; }
-    const d = new Date();
-    const v = { title: `צילום מסך · ${HE_CITY[c] || c} · ${d.getDate()}.${d.getMonth() + 1} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`,
-      city: c, country: "", mode: "simple", source: { platform: "screenshot", author: "צילום מסך" }, places: found.map((p, i) => ({ ...p, id: "s" + (i + 1) })), screenText: lines.join("\n").slice(0, 3000), ocrDone: true };
-    v.key = vidKey(v);
-    state.feed = [v, ...state.feed]; saveFeed();
-    state.res = v; state.sel = null; state.tab = "list"; state.folder = null; delete state.days.v;
-    render(); locateCurrent();
-    setStatus(`נמצאו ${found.length} מקומות בצילום: ${found.map(p => p.name).join(", ")}.`);
-  } catch (e) { console.error(e); setStatus("קריאת הצילום נכשלה. נסה שוב.", true); }
-  finally { ocrNow = false; note.hidden = true; }
-}
-$("#shotBtn").onclick = () => $("#shotFile").click();
-$("#shotFile").addEventListener("change", async e => {
-  const files = [...e.target.files].slice(0, 10); e.target.value = "";
-  if (!files.length) return;
-  const images = await Promise.all(files.map(readFile));
-  ocrShots(images, "");
-});
-$("#cityForm").addEventListener("submit", e => {
-  e.preventDefault();
-  const t = $("#cityIn").value.trim(); if (!t) return;
-  const en = cityFromText(t) || t;
-  $("#cityForm").hidden = true; $("#cityIn").value = "";
-  const imgs = state.pendingShots; state.pendingShots = null;
-  if (imgs) ocrShots(imgs, en);
-});
 
 /* ---- render ---- */
 function placeHTML(p, i, city, inFolder){
@@ -841,7 +813,7 @@ function render(){
   $("#title").textContent = folder ? folder.name : cleanTitle(r.title);
   $("#meta").innerHTML = folder
     ? `<button class="small" id="backFolders" type="button">› כל התיקיות</button><span>${places.length} מקומות</span><button class="small" id="delFolderAsk" type="button">מחק תיקייה</button>`
-    : `${r.source?.author?`<span>${esc(r.source.author)}</span><span>·</span>`:""}<span>${esc([r.city,r.country].filter(Boolean).join(", "))}</span>${r.mode==="simple"?`<span class="chip warn">חילוץ בסיסי</span>`:""}${r.source?.url?`<a class="sub" href="${esc(r.source.url)}" target="_blank" rel="noopener">לסרטון</a>`:""}${r.source?.platform === "tiktok" && !r.ocrDone ? `<button class="small" data-ocr type="button">📷 קרא טקסט מהמסך</button>` : ""}${r.summary?`<p class="vsum"><b>מה נאמר בסרטון:</b> ${esc(r.summary)}</p>`:""}`;
+    : `${r.source?.author?`<span>${esc(r.source.author)}</span><span>·</span>`:""}<span>${esc([r.city,r.country].filter(Boolean).join(", "))}</span>${r.mode==="simple"?`<span class="chip warn">חילוץ בסיסי</span>`:""}${r.source?.url?`<a class="sub" href="${esc(r.source.url)}" target="_blank" rel="noopener">לסרטון</a>`:""}${r.ocrFailed && !r.ocrDone ? `<button class="small" data-ocr type="button">📷 נסה שוב לקרוא את הטקסט שעל המסך</button>` : ""}${r.summary?`<p class="vsum"><b>מה נאמר בסרטון:</b> ${esc(r.summary)}</p>`:""}`;
 
   const sel = state.sel != null ? places[state.sel] : null;
   const src = sel ? embedOne(sel, sel.city || city) : embedAll(places, city, mode);
@@ -891,7 +863,7 @@ document.addEventListener("click", e => {
   if (t.id === "delFolderNo") { $("#delFolderConfirm").hidden = true; return; }
   if (t.id === "delFolderYes") { const f = state.folders.find(x => x.id === state.folder); state.folders = state.folders.filter(x => x !== f); saveFolders(); state.folder = null; state.sel = null; setStatus(`התיקייה "${f.name}" נמחקה.`); render(); return; }
   if (t.matches("[data-remove]")) { const f = state.folders.find(x => x.id === state.folder); f.places.splice(+t.dataset.remove, 1); saveFolders(); state.sel = null; render(); return; }
-  if (t.matches("[data-ocr]")) { if (state.res) ocrVideo(state.res); return; }
+  if (t.matches("[data-ocr]")) { if (state.res) { delete state.res.ocrFailed; ocrVideo(state.res); } return; }
   if (t.matches("[data-share]")) { navigator.share({ text: decodeURIComponent(t.dataset.share) }).catch(() => {}); return; }
   if (t.matches("[data-days]")) {
     const [ctx, step] = t.dataset.days.split("|");
