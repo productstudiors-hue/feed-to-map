@@ -44,7 +44,7 @@ button:disabled{opacity:.55;cursor:default}
 .head h2{font-family:var(--f-display);font-size:32px;line-height:1.05}
 .meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--muted)}
 .chip{font-size:11px;font-weight:500;padding:2px 8px;border-radius:99px;background:var(--soft);color:var(--ink)}
-.cat-sel{font:inherit;font-size:12px;font-weight:600;padding:2px 6px;border-radius:99px;border:1px solid var(--line);background:var(--surface);color:var(--ink);max-width:160px}
+.cat-chip{font-weight:600}
 .catbar{display:flex;gap:6px;overflow-x:auto;padding:2px 0 10px;scrollbar-width:none}
 .catbar button{flex:0 0 auto;font-size:13px;padding:6px 12px;border-radius:99px;border:1px solid var(--line);background:var(--surface);color:var(--ink);white-space:nowrap}
 .catbar button[aria-pressed="true"]{background:var(--ink);color:var(--surface);border-color:var(--ink)}
@@ -125,7 +125,7 @@ button:disabled{opacity:.55;cursor:default}
 </head>
 <body>
 <main class="app">
-  <header class="brand"><h1>מהפיד <span>למפה</span></h1><span class="count" id="ver">v1.4</span></header>
+  <header class="brand"><h1>מהפיד <span>למפה</span></h1><span class="count" id="ver">v1.4.1</span></header>
 
   <form class="scan" id="form">
     <input id="url" type="url" inputmode="url" placeholder="הדבק קישור מטיקטוק או אינסטגרם" aria-label="קישור לסרטון" required>
@@ -843,7 +843,7 @@ function placeHTML(p, i, city, inFolder){
     ${p.img ? `<figure class="ph"><img src="${esc(p.img)}" alt="${esc(p.name)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.closest('figure').remove()"><figcaption><a href="${esc(p.imgSrc)}" target="_blank" rel="noopener" data-stop>${p.imgBy ? "גוגל · " + esc(p.imgBy) : "ויקיפדיה"}</a></figcaption></figure>` : ""}
     <div class="num">${i+1}</div><div class="body">
       <h3>${esc(p.name)}</h3>${p.local && p.local!==p.name?`<div class="local">${esc(p.local)}</div>`:""}
-      <div class="meta">${p.from === "speech" || p.from === "screen" ? `<span class="chip vid-chip">${p.from === "speech" ? "נאמר בסרטון" : "הופיע על המסך"}</span>` : ""}<select class="cat-sel" data-cat="${i}" data-stop aria-label="קטגוריה של ${esc(p.name)}">${Object.entries(CATS).map(([k, c]) => `<option value="${k}" ${catOf(p) === k ? "selected" : ""}>${c.icon} ${c.label}</option>`).join("")}</select>${inFolder && p.city?`<span>${esc(p.city)}</span>`:""}${areaOf(p)?`<span class="chip area-chip">${esc(areaOf(p))}</span>`:(p.neighborhood?`<span>${esc(p.neighborhood)}</span>`:"")}${p.price?`<span>${esc(p.price)}</span>`:""}</div>
+      <div class="meta">${p.from === "speech" || p.from === "screen" ? `<span class="chip vid-chip">${p.from === "speech" ? "נאמר בסרטון" : "הופיע על המסך"}</span>` : ""}<span class="chip cat-chip">${CATS[catOf(p)].icon} ${CATS[catOf(p)].label}</span>${inFolder && p.city?`<span>${esc(p.city)}</span>`:""}${areaOf(p)?`<span class="chip area-chip">${esc(areaOf(p))}</span>`:(p.neighborhood?`<span>${esc(p.neighborhood)}</span>`:"")}${p.price?`<span>${esc(p.price)}</span>`:""}</div>
       ${p.why?`<p>${esc(p.why)}</p>`:""}${p.dish?`<div class="sub">להזמין: ${esc(p.dish)}</div>`:""}
       ${p.rating?`<div class="score">★ ${(+p.rating).toFixed(1)} <small>גוגל · ${p.ratingCount||0} ביקורות</small></div>`:""}
       ${p.address?`<div class="sub">${esc(p.address.split(",").slice(0,3).join(","))}</div>`:""}
@@ -930,16 +930,6 @@ function renderTabs(r){
   $("#tabs").innerHTML = tabs.map(([k,l,c]) => `<button role="tab" aria-selected="${state.tab===k}" data-tab="${k}">${l} <span class="count">${c}</span></button>`).join("");
 }
 
-document.addEventListener("change", e => {
-  const t = e.target;
-  if (!t.matches("[data-cat]")) return;
-  const folder = state.tab === "folders" ? state.folders.find(f => f.id === state.folder) : null;
-  const p = (folder ? folder.places : state.res?.places || [])[+t.dataset.cat];
-  if (!p) return;
-  p.cat = t.value; p.catManual = true;
-  if (folder) saveFolders(); else saveFeed();
-  render();
-});
 document.addEventListener("click", e => {
   const t = e.target.closest("[data-catf],[data-ocr],[data-tab],[data-save],[data-remove],[data-del],[data-folder],[data-pick],[data-days],[data-share],.place,#addAll,[data-video],[data-delvideo],#showAll,#backFolders,#delFolderAsk,#delFolderYes,#delFolderNo,#sheetClose,#sheet");
   if (!t) return;
