@@ -177,7 +177,7 @@ button:disabled{opacity:.55;cursor:default}
 </head>
 <body>
 <main class="app">
-  <header class="brand"><h1 dir="ltr">FeedTrip</h1><span class="count" id="ver">v1.6.1</span></header>
+  <header class="brand"><h1 dir="ltr">FeedTrip</h1><span class="count" id="ver">v1.6.2</span></header>
 
   <h2 class="hero">ראית מקום בטיקטוק?<span>שים אותו על המפה.</span></h2>
   <p class="hero-sub">מדביקים קישור מטיקטוק או אינסטגרם, ומקבלים את כל המקומות מהסרטון על מפה, מסודרים לפי אזורים.</p>
@@ -752,13 +752,35 @@ function ocrCandidates(lines){
 }
 const COUNTRIES_EN = "Indonesia|Italy|France|Spain|Portugal|Greece|Japan|Thailand|Vietnam|Czechia|Czech Republic|Germany|Austria|Hungary|Netherlands|United Kingdom|England|Croatia|Turkey|Mexico|Peru|USA|United States|Israel|Georgia|Cyprus|Montenegro|Albania|Switzerland|Morocco|Sri Lanka|India|Philippines|Malaysia|South Korea|China|Australia|Iceland|Norway";
 const REGIONS = { "באלי":"Bali", "טוסקנה":"Tuscany", "סנטוריני":"Santorini", "פוקט":"Phuket", "אמלפי":"Amalfi", "סרדיניה":"Sardinia", "סיציליה":"Sicily", "קפריסין":"Cyprus", "מדיירה":"Madeira", "כרתים":"Crete", "גאורגיה":"Georgia", "טביליסי":"Tbilisi" };
+// Whole words only ("פורטובלו" in London is not Porto); the first line counts most, then the city named most often.
 function cityFromText(text){
+  text = String(text || "");
   const tag = text.match(new RegExp(`([A-Z][A-Za-zÀ-ÿ'’.\\- ]{2,30}),\\s*(?:${COUNTRIES_EN})\\b`));
   if (tag) return tag[1].trim();
-  for (const [he, en] of Object.entries(REGIONS)) if (text.includes(he) || new RegExp(`\\b${en}\\b`, "i").test(text)) return en;
-  for (const [en, he] of Object.entries(HE_CITY)) if (text.includes(he) || new RegExp(`\\b${en}\\b`, "i").test(text)) return en;
-  if (/\bRoma\b/i.test(text)) return "Rome";
-  return "";
+  const first = text.split("\n")[0], score = {};
+  const add = (en, src, flags) => {
+    const n = (text.match(new RegExp(src, flags + "g")) || []).length;
+    if (n) score[en] = (score[en] || 0) + n + (new RegExp(src, flags).test(first) ? 10 : 0);
+  };
+  const heWord = he => `(?:^|[^֐-׿])[בלהמושכ]?${he}(?![֐-׿])`;
+  for (const [he, en] of Object.entries(REGIONS)) { add(en, heWord(he), ""); add(en, `\\b${en}\\b`, "i"); }
+  for (const [en, he] of Object.entries(HE_CITY)) { add(en, heWord(he), ""); add(en, `\\b${en}\\b`, "i"); }
+  add("Rome", "\\bRoma\\b", "i");
+  return Object.entries(score).sort((a, b) => b[1] - a[1])[0]?.[0] || "";
+}
+// Videos saved before the city fix may carry the wrong city (a London video marked Porto). Fix them once,
+// and look their places up again in the right city.
+function fixCities(){
+  let changed = false;
+  state.feed.forEach(v => {
+    if (v.cityFixed) return;
+    v.cityFixed = true; changed = true;
+    const c = cityFromText([v.title, v.source?.caption].filter(Boolean).join("\n"));
+    if (!c || c === v.city) return;
+    v.city = c; v.country = "";
+    v.places.forEach(p => { if (p.source === "google") return; ["lat","lng","area","address","osm","geoTried","img","imgSrc","imgBy","imgTried","wiki"].forEach(k => delete p[k]); p.city = c; });
+  });
+  if (changed) saveFeed();
 }
 async function verifyCandidates(names, city, existing){
   const center = await cityCenter(city);
@@ -1035,6 +1057,7 @@ $("#resetYes").onclick = () => {
 /* shared from another app, or opened with ?url= */
 const qs = new URLSearchParams(location.search);
 const shared = qs.get("url") || qs.get("text") || qs.get("title");
+fixCities();
 render();
 locateCurrent();
 if (extractUrl(shared)) { history.replaceState(null, "", location.pathname); scan(shared); }
