@@ -239,6 +239,12 @@ button.primary{background:var(--ink);color:var(--paper);border-radius:14px}
 .fbtn{border:0;background:var(--soft)}
 #geoNote:not([hidden])::before{background:var(--pin)}
 .bar i{background:var(--pin)}
+/* Pinny talks: messages appear as a small speech bubble next to his face */
+.hello .hi{margin:0;font-family:var(--f-display);color:var(--pin);font-size:18px}
+.status:not(:empty),#geoNote:not([hidden]){position:relative;display:block;margin-inline-start:40px;background:var(--surface);color:var(--ink);border-radius:18px;border-end-start-radius:6px;padding:10px 14px;box-shadow:var(--shadow);font-size:14.5px;min-height:0}
+.status:not(:empty)::after,#geoNote:not([hidden])::after{content:"";position:absolute;inset-inline-start:-38px;bottom:0;width:28px;height:35px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 80'%3E%3Cpath d='M32 4C18 4 7 15 7 29c0 19 25 45 25 45s25-26 25-45C57 15 46 4 32 4z' fill='%23FF8FA3'/%3E%3Cellipse cx='18.5' cy='35' rx='4.5' ry='2.6' fill='%23FFC9D4'/%3E%3Cellipse cx='45.5' cy='35' rx='4.5' ry='2.6' fill='%23FFC9D4'/%3E%3Ccircle cx='24' cy='28' r='3.4' fill='%233B3654'/%3E%3Ccircle cx='40' cy='28' r='3.4' fill='%233B3654'/%3E%3Cpath d='M26.5 36.5q5.5 4.6 11 0' stroke='%233B3654' stroke-width='2.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat}
+#geoNote:not([hidden])::before{display:none}
+.status.err:not(:empty){background:var(--sel);color:var(--ink)}
 @media (min-width:600px){.card,.tabs,.catbar,.vids{margin-inline:0}.map{border-radius:18px;overflow:hidden}.tabs{padding:0}}
 @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
 </style>
@@ -246,19 +252,8 @@ button.primary{background:var(--ink);color:var(--paper);border-radius:14px}
 <body>
 <main class="app">
   <header class="brand"><div class="logo"><svg class="pal" viewBox="0 0 64 80" aria-hidden="true"><path d="M32 4C18 4 7 15 7 29c0 19 25 45 25 45s25-26 25-45C57 15 46 4 32 4z" fill="var(--pin)"/><ellipse cx="18.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><ellipse cx="45.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><circle cx="24" cy="28" r="3.4" fill="var(--face)"/><circle cx="40" cy="28" r="3.4" fill="var(--face)"/><circle cx="25.3" cy="26.8" r="1.1" fill="#fff"/><circle cx="41.3" cy="26.8" r="1.1" fill="#fff"/><path d="M26.5 36.5q5.5 4.6 11 0" stroke="var(--face)" stroke-width="2.6" fill="none" stroke-linecap="round"/></svg><h1 dir="ltr">FeedTrip</h1></div>
-    <div class="hdr"><span class="count" id="ver">v1.8.1</span><button class="addbtn" id="addBtn" type="button" aria-expanded="false" aria-controls="addBox" aria-label="הוספת קישור לסרטון"><span aria-hidden="true">+</span></button></div></header>
+    <div class="hdr"><span class="count" id="ver">v1.9</span><button class="addbtn" id="addBtn" type="button" aria-expanded="false" aria-controls="addBox" aria-label="הוספת קישור לסרטון"><span aria-hidden="true">+</span></button></div></header>
 
-  <section class="hello" id="hello">
-    <div class="hello-pal"><svg class="pal" viewBox="0 0 64 80" aria-hidden="true"><path d="M32 4C18 4 7 15 7 29c0 19 25 45 25 45s25-26 25-45C57 15 46 4 32 4z" fill="var(--pin)"/><ellipse cx="18.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><ellipse cx="45.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><circle cx="24" cy="28" r="3.4" fill="var(--face)"/><circle cx="40" cy="28" r="3.4" fill="var(--face)"/><circle cx="25.3" cy="26.8" r="1.1" fill="#fff"/><circle cx="41.3" cy="26.8" r="1.1" fill="#fff"/><path d="M26.5 36.5q5.5 4.6 11 0" stroke="var(--face)" stroke-width="2.6" fill="none" stroke-linecap="round"/></svg></div>
-    <h2>היי, מה נשמור היום?</h2>
-    <p>כל סרטון טיול או אוכל שאהבתם הופך כאן לרשימת מקומות על מפה, מסודרת לפי אזורים.</p>
-    <ol class="steps">
-      <li>בטיקטוק או באינסטגרם לוחצים על <b>שיתוף</b></li>
-      <li>בוחרים ב-<b>FeedTrip</b></li>
-      <li>המקומות מחכים לכם כאן</li>
-    </ol>
-    <button class="linkish" id="helloAdd" type="button">או הדביקו קישור</button>
-  </section>
 
   <div class="addbox" id="addBox" hidden>
     <form class="scan" id="form">
@@ -274,6 +269,19 @@ button.primary{background:var(--ink);color:var(--paper);border-radius:14px}
     <input id="pin" type="password" inputmode="numeric" autocomplete="off" placeholder="קוד גישה אישי" aria-label="קוד גישה אישי" style="direction:rtl;text-align:right;font-family:var(--f-body)">
     <button class="primary" type="submit">שמור</button>
   </form>
+
+  <section class="hello" id="hello">
+    <div class="hello-pal"><svg class="pal" viewBox="0 0 64 80" aria-hidden="true"><path d="M32 4C18 4 7 15 7 29c0 19 25 45 25 45s25-26 25-45C57 15 46 4 32 4z" fill="var(--pin)"/><ellipse cx="18.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><ellipse cx="45.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><circle cx="24" cy="28" r="3.4" fill="var(--face)"/><circle cx="40" cy="28" r="3.4" fill="var(--face)"/><circle cx="25.3" cy="26.8" r="1.1" fill="#fff"/><circle cx="41.3" cy="26.8" r="1.1" fill="#fff"/><path d="M26.5 36.5q5.5 4.6 11 0" stroke="var(--face)" stroke-width="2.6" fill="none" stroke-linecap="round"/></svg></div>
+    <p class="hi">היי, אני פיני 👋</p>
+    <h2>מה נשמור היום?</h2>
+    <p>כל סרטון טיול או אוכל שאהבתם הופך כאן לרשימת מקומות על מפה, מסודרת לפי אזורים.</p>
+    <ol class="steps">
+      <li>בטיקטוק או באינסטגרם לוחצים על <b>שיתוף</b></li>
+      <li>בוחרים ב-<b>FeedTrip</b></li>
+      <li>המקומות מחכים לכם כאן</li>
+    </ol>
+    <button class="linkish" id="helloAdd" type="button">או הדביקו קישור</button>
+  </section>
 
   <section class="feedbar" id="feedBar" hidden aria-label="הפיד שלי"></section>
   <p class="status" id="geoNote" hidden></p>
@@ -346,7 +354,7 @@ async function scan(raw){
   if (!url) { setStatus("לא מצאתי קישור. הדבק קישור שמתחיל ב־https://", true); return; }
   $("#url").value = url;
   $("#go").disabled = true; $("#bar").hidden = false; $("#setup").innerHTML = "";
-  setStatus("קורא את הסרטון ומאתר את המקומות… (כמה שניות)");
+  setStatus("רגע, אני קורא את הסרטון ומחפש את המקומות…");
   try {
     const r = await fetch(API, { method:"POST", headers:{ "Content-Type":"application/json", Authorization:`Bearer ${ANON}`, apikey: ANON }, body: JSON.stringify({ url, pin: store.get("ftm_pin", "") }) });
     const j = await r.json().catch(() => ({}));
@@ -372,7 +380,7 @@ async function scan(raw){
     saveFeed();
     state.res = j; state.sel = null; state.tab = "list"; state.folder = null; delete state.days.v;
     setAddBox(false); $("#url").value = "";
-    setStatus(`נמצאו ${j.places.length} מקומות. שמור אותם בתיקייה, או מחק את מה שלא מעניין אותך.`);
+    setStatus(`מצאתי ${j.places.length} מקומות! אפשר לשמור אותם בתיקייה, או למחוק את מה שפחות מעניין.`);
     render();
     locateCurrent();
   } catch {
@@ -425,7 +433,7 @@ function addToFolder(id){
   state.pick.forEach(p => { if (!f.places.some(t => key(t) === key(p))) { f.places.push(p); added++; } });
   saveFolders();
   state.pick = null; renderSheet();
-  setStatus(added ? `נשמרו ${added} מקומות בתיקייה "${f.name}". הם נשארים גם בפיד.` : `המקומות כבר נמצאים בתיקייה "${f.name}".`);
+  setStatus(added ? `שמרתי ${added} מקומות בתיקייה "${f.name}". הם נשארים גם בפיד.` : `המקומות כבר נמצאים בתיקייה "${f.name}".`);
   render();
 }
 // Deleting from the feed never touches folders.
@@ -642,7 +650,7 @@ async function locatePlaces(places, city, onDone){
       let changed = 0;
       const worker = async () => { while (queue.length) { const p = queue.shift(); const r = await locateOne(p, city, center).catch(() => "retry"); if (r !== "retry") p.geoTried = true; if (r === "ok") { changed++; onDone(); } } };
       await Promise.all([worker(), worker()]);
-      setStatus(changed ? `נמצא מיקום ואזור ל־${changed} מקומות.` : $("#status").textContent);
+      setStatus(changed ? `מצאתי מיקום ואזור ל־${changed} מקומות.` : $("#status").textContent);
     }
   } finally { locatingNow.delete(places); onDone(); if (note) note.hidden = true; }
 }
@@ -766,7 +774,7 @@ async function deepScan(v){
       have.push(t); added++;
     });
     if (added && v.mode === "simple" && v.places.every(p => p.lat)) v.mode = "full";
-    if (added) setStatus(`נמצאו עוד ${added} מקומות מתוך מה שנאמר או הופיע בסרטון.`);
+    if (added) setStatus(`מצאתי עוד ${added} מקומות ממה שנאמר או הופיע בסרטון.`);
     return added > 0;
   } catch { return false; }
   finally { deepNow.delete(v); if (note) note.hidden = true; }
@@ -940,7 +948,7 @@ async function ocrVideo(v, { silent = false } = {}){
     if (!silent) {
       saveFeed(); render(); locateCurrent();
       const pics = images.length > 1 ? `${images.length} תמונות` : "תמונה אחת";
-      setStatus((found.length ? `נמצאו עוד ${found.length} מקומות מהטקסט שעל המסך: ${found.map(p => p.name).join(", ")}.` : `קראתי את הטקסט שעל המסך (${pics}), ולא מצאתי בו מקומות חדשים.`)
+      setStatus((found.length ? `מצאתי עוד ${found.length} מקומות בטקסט שעל המסך: ${found.map(p => p.name).join(", ")}.` : `קראתי את הטקסט שעל המסך (${pics}), ולא מצאתי בו מקומות חדשים.`)
         + (partial ? " מאינסטגרם אפשר לקרוא כרגע רק את התמונה הראשונה של הפוסט." : ""));
     }
     return found.length;
@@ -1160,7 +1168,7 @@ $("#resetYes").onclick = () => {
   state = { feed: [], res: null, tab: "list", sel: null, folders: [], folder: null, days: {}, pick: null };
   $("#url").value = ""; $("#gmap").removeAttribute("src"); delete $("#gmap").dataset.src;
   $("#resetConfirm").hidden = true; $("#resetAsk").hidden = false;
-  setStatus("האפליקציה אופסה. אפשר להתחיל מחדש.");
+  setStatus("ניקיתי הכל. מתחילים מחדש!");
   render(); window.scrollTo({ top: 0 });
 };
 
