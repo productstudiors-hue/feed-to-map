@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)"><meta name="theme-color" content="#0C121C" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F8F6FF" media="(prefers-color-scheme: light)"><meta name="theme-color" content="#17152A" media="(prefers-color-scheme: dark)">
 <title>FeedTrip</title>
 <link rel="manifest" href="manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&family=Varela+Round&display=swap">
 <style>
 :root{
   --paper:#FFFFFF; --surface:#FFFFFF; --ink:#0F1B2D; --muted:#6B7686; --line:#E7EAEE; --soft:#F3F5F8;
@@ -171,21 +171,98 @@ button:disabled{opacity:.55;cursor:default}
 .newf input,.sheet input{font:inherit;border:1px solid var(--line);border-radius:12px;padding:11px 12px;background:var(--surface);color:var(--ink)}
 .reset{margin-top:36px;display:flex;flex-direction:column;align-items:flex-start;gap:10px}
 #resetAsk{background:transparent;border-color:transparent;color:var(--muted);text-decoration:underline;padding-inline:0;font-size:13px}
+/* ---------- gentle & sweet ---------- */
+:root{--paper:#F8F6FF;--surface:#FFFFFF;--ink:#3B3654;--muted:#8A85A3;--line:#ECE9F5;--soft:#F1EEFA;
+  --brand:#3B3654;--pin:#FF8FA3;--pin-ink:#FFFFFF;--blush:#FFC9D4;--face:#3B3654;--mint:#BDEBDD;--mint-ink:#1F6B55;
+  --sel:#FFF0F3;--ok:#1F8A6B;--route:#FF8FA3;--f-display:"Varela Round","Rubik",sans-serif;--shadow:0 8px 24px rgba(59,54,84,.07)}
+@media (prefers-color-scheme: dark){:root{--paper:#17152A;--surface:#211E38;--ink:#EEEBFA;--muted:#A6A1C0;--line:#2F2B4A;--soft:#2A2645;
+  --brand:#EEEBFA;--pin:#FF9DB0;--blush:#FF7E98;--face:#2A2140;--sel:#33263F;--mint:#244A40;--mint-ink:#A7E9D6;--shadow:0 8px 24px rgba(0,0,0,.35)}}
+h1,h2,h3,.sec,.tabs button,.catbar button{font-family:var(--f-display);font-weight:400}
+.brand{padding-top:4px}
+.logo{display:flex;align-items:center;gap:8px}
+.logo .pal{width:26px;height:32px}
+.brand h1{font-family:var(--f-display);font-weight:400;font-size:22px;letter-spacing:.2px}
+.brand h1::before{display:none}
+.hdr{display:flex;align-items:center;gap:10px}
+.addbtn{width:42px;height:42px;padding:0;border-radius:50%;border:0;background:var(--ink);color:var(--paper);font-size:26px;line-height:1;box-shadow:var(--shadow);transition:transform .2s ease}
+.addbtn span{display:block;margin-top:-2px}
+.addbtn.on{transform:rotate(45deg)}
+.hello{display:flex;flex-direction:column;align-items:center;text-align:center;gap:10px;padding:26px 8px 8px}
+.hello-pal .pal{width:84px;height:105px;animation:bob 3.2s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(-6px) rotate(-3deg)}}
+.hello h2{font-size:28px;line-height:1.2;margin-top:4px}
+.hello p{margin:0;color:var(--muted);max-width:32ch}
+.steps{list-style:none;counter-reset:s;margin:10px 0 2px;padding:0;display:flex;flex-direction:column;gap:8px;width:100%;max-width:330px}
+.steps li{counter-increment:s;display:flex;align-items:center;gap:12px;background:var(--surface);border-radius:18px;padding:12px 14px;box-shadow:var(--shadow);text-align:right;font-size:15px}
+.steps li::before{content:counter(s);flex:0 0 28px;height:28px;border-radius:50%;background:var(--sel);color:var(--ink);display:grid;place-items:center;font-family:var(--f-display)}
+.linkish{background:transparent;border:0;color:var(--muted);text-decoration:underline;text-underline-offset:3px;font-size:14px;padding:6px}
+body.has-feed .hello{display:none}
+.addbox{display:flex;flex-direction:column;gap:8px;background:var(--surface);border-radius:22px;padding:10px;box-shadow:var(--shadow)}
+.scan{border:0;background:var(--soft);background-image:none;border-radius:16px;padding:5px}
+.scan input{padding:9px 10px}
+button.primary{background:var(--ink);color:var(--paper);border-radius:14px}
+.addbox .row .small{background:transparent;border-color:transparent;color:var(--muted)}
+.feedhead b{font-family:var(--f-display);font-weight:400;font-size:19px}
+.vframe{border-radius:20px}
+.vid.on .vframe{box-shadow:0 0 0 2.5px var(--paper),0 0 0 5px var(--pin)}
+.vdel{background:rgba(59,54,84,.45)}
+.card{margin:4px 0 0}
+.map{border-radius:24px;overflow:hidden;box-shadow:var(--shadow)}
+.head h2{font-family:var(--f-display);font-weight:400;font-size:24px}
+.meta a{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
+.tabs{position:sticky;top:6px;margin:0;padding:4px;gap:4px;border:0;border-radius:16px;background:var(--soft)}
+.tabs button{flex:1;border:0;border-radius:12px;padding:9px 6px;margin:0;color:var(--muted)}
+.tabs button[aria-selected=true]{background:var(--surface);color:var(--ink);box-shadow:0 2px 8px rgba(59,54,84,.08)}
+.catbar button{border:0;background:var(--surface);box-shadow:0 2px 8px rgba(59,54,84,.06)}
+.catbar button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.list{background:var(--surface);border-radius:24px;padding:4px 14px;box-shadow:var(--shadow)}
+.place{padding:14px 0}
+.place.sel{margin:0 -14px;padding-inline:14px;background:var(--sel)}
+.thumb{border-radius:18px}
+.num{background:var(--pin);box-shadow:0 0 0 2px var(--surface)}
+.body h3{font-family:var(--f-display);font-weight:400;font-size:17px}
+.primary-link{background:var(--ink);color:var(--paper);border-color:var(--ink);border-radius:12px}
+.acts .btn,.acts button{border-radius:12px}
+.saved{color:var(--mint-ink);background:var(--mint);border-radius:10px;padding:3px 9px}
+.tag-src{background:var(--sel);color:#C2456A}
+.savebar{background:var(--surface);box-shadow:var(--shadow);border-radius:20px}
+.save-all{background:var(--ink);color:var(--paper);border-radius:14px}
+.day{background:var(--surface);border:0;border-radius:22px;padding:16px;box-shadow:var(--shadow);margin-bottom:12px}
+.day h3{font-family:var(--f-display);font-weight:400}
+.stops{border-right:2px dotted var(--pin)}
+.sheet{border-radius:28px 28px 0 0}
+.sheet h3{font-family:var(--f-display);font-weight:400}
+.fbtn{border:0;background:var(--soft)}
+#geoNote:not([hidden])::before{background:var(--pin)}
+.bar i{background:var(--pin)}
 @media (min-width:600px){.card,.tabs,.catbar,.vids{margin-inline:0}.map{border-radius:18px;overflow:hidden}.tabs{padding:0}}
 @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
 <main class="app">
-  <header class="brand"><h1 dir="ltr">FeedTrip</h1><span class="count" id="ver">v1.7.1</span></header>
+  <header class="brand"><div class="logo"><svg class="pal" viewBox="0 0 64 80" aria-hidden="true"><path d="M32 4C18 4 7 15 7 29c0 19 25 45 25 45s25-26 25-45C57 15 46 4 32 4z" fill="var(--pin)"/><ellipse cx="18.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><ellipse cx="45.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><circle cx="24" cy="28" r="3.4" fill="var(--face)"/><circle cx="40" cy="28" r="3.4" fill="var(--face)"/><circle cx="25.3" cy="26.8" r="1.1" fill="#fff"/><circle cx="41.3" cy="26.8" r="1.1" fill="#fff"/><path d="M26.5 36.5q5.5 4.6 11 0" stroke="var(--face)" stroke-width="2.6" fill="none" stroke-linecap="round"/></svg><h1 dir="ltr">FeedTrip</h1></div>
+    <div class="hdr"><span class="count" id="ver">v1.8</span><button class="addbtn" id="addBtn" type="button" aria-expanded="false" aria-controls="addBox" aria-label="הוספת קישור לסרטון"><span aria-hidden="true">+</span></button></div></header>
 
-  <h2 class="hero">ראית מקום בטיקטוק?<span>שים אותו על המפה.</span></h2>
-  <p class="hero-sub">מדביקים קישור מטיקטוק או אינסטגרם, ומקבלים את כל המקומות מהסרטון על מפה, מסודרים לפי אזורים.</p>
-  <form class="scan" id="form">
-    <input id="url" type="url" inputmode="url" placeholder="הדביקו כאן קישור לסרטון" aria-label="קישור לסרטון" required>
-    <button class="primary" id="go" type="submit">סרוק</button>
-  </form>
-  <div class="row"><button class="small" id="paste" type="button">הדבק מהלוח</button><span class="sub">באנדרואיד אפשר גם לשתף מטיקטוק ישר לאפליקציה</span></div>
+  <section class="hello" id="hello">
+    <div class="hello-pal"><svg class="pal" viewBox="0 0 64 80" aria-hidden="true"><path d="M32 4C18 4 7 15 7 29c0 19 25 45 25 45s25-26 25-45C57 15 46 4 32 4z" fill="var(--pin)"/><ellipse cx="18.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><ellipse cx="45.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><circle cx="24" cy="28" r="3.4" fill="var(--face)"/><circle cx="40" cy="28" r="3.4" fill="var(--face)"/><circle cx="25.3" cy="26.8" r="1.1" fill="#fff"/><circle cx="41.3" cy="26.8" r="1.1" fill="#fff"/><path d="M26.5 36.5q5.5 4.6 11 0" stroke="var(--face)" stroke-width="2.6" fill="none" stroke-linecap="round"/></svg></div>
+    <h2>היי, מה נשמור היום?</h2>
+    <p>כל סרטון טיול או אוכל שאהבתם הופך כאן לרשימת מקומות על מפה, מסודרת לפי אזורים.</p>
+    <ol class="steps">
+      <li>בטיקטוק או באינסטגרם לוחצים על <b>שיתוף</b></li>
+      <li>בוחרים ב-<b>FeedTrip</b></li>
+      <li>המקומות מחכים לכם כאן</li>
+    </ol>
+    <button class="linkish" id="helloAdd" type="button">או הדביקו קישור</button>
+  </section>
+
+  <div class="addbox" id="addBox" hidden>
+    <form class="scan" id="form">
+      <input id="url" type="url" inputmode="url" placeholder="הדביקו כאן קישור לסרטון" aria-label="קישור לסרטון" required>
+      <button class="primary" id="go" type="submit">הוספה</button>
+    </form>
+    <div class="row"><button class="small" id="paste" type="button">הדבק מהלוח</button></div>
+  </div>
   <div class="bar" id="bar" hidden><i></i></div>
   <p class="status" id="status" role="status"></p>
   <div id="setup"></div>
@@ -290,6 +367,7 @@ async function scan(raw){
     state.feed = [j, ...state.feed.filter(v => v.key !== j.key)];
     saveFeed();
     state.res = j; state.sel = null; state.tab = "list"; state.folder = null; delete state.days.v;
+    setAddBox(false); $("#url").value = "";
     setStatus(`נמצאו ${j.places.length} מקומות. שמור אותם בתיקייה, או מחק את מה שלא מעניין אותך.`);
     render();
     locateCurrent();
@@ -1081,6 +1159,15 @@ $("#resetYes").onclick = () => {
   setStatus("האפליקציה אופסה. אפשר להתחיל מחדש.");
   render(); window.scrollTo({ top: 0 });
 };
+
+/* the link box lives behind the "+" button */
+function setAddBox(open){
+  $("#addBox").hidden = !open; $("#addBtn").setAttribute("aria-expanded", String(open));
+  $("#addBtn").classList.toggle("on", open);
+  if (open) setTimeout(() => $("#url").focus(), 50);
+}
+$("#addBtn").onclick = () => setAddBox($("#addBox").hidden);
+$("#helloAdd").onclick = () => setAddBox(true);
 
 /* shared from another app, or opened with ?url= */
 const qs = new URLSearchParams(location.search);
