@@ -310,6 +310,19 @@ body.busy .status::after,body.busy #geoNote::after{animation:bob 1s ease-in-out 
 .catbar button .n{color:var(--muted);font-size:12px}
 .catbar button[class*="cat-"]{background:var(--surface)}
 .catbar button[aria-pressed="true"] .ci,.catbar button[aria-pressed="true"] .n{color:inherit}
+/* ---- place card: read in place, map button on the photo ---- */
+.thumb{overflow:visible}
+.thumb img{border-radius:inherit}
+.mapbtn{position:absolute;left:5px;bottom:5px;width:28px;height:28px;padding:0;border:0;border-radius:10px;display:grid;place-items:center;background:rgba(255,255,255,.92);color:var(--ink);box-shadow:0 2px 8px rgba(59,54,84,.18)}
+.mapbtn svg{width:16px;height:16px}
+.mapbtn::before{content:"";position:absolute;inset:-8px}
+.place.sel .mapbtn{background:var(--pin);color:#fff}
+@media (prefers-color-scheme: dark){.mapbtn{background:rgba(33,30,56,.92);color:var(--ink)}}
+.place.sel{background:transparent;margin:0;padding-inline:0}
+.place.sel .thumb{box-shadow:0 0 0 2.5px var(--surface),0 0 0 5px var(--pin)}
+.place.open .why{-webkit-line-clamp:unset;display:block}
+.more{font-size:13px;color:var(--muted);text-decoration:underline;text-underline-offset:3px}
+.bigimg{display:block;width:100%;height:190px;object-fit:cover;border-radius:16px;margin:0 0 8px}
 @media (min-width:600px){.card,.tabs,.catbar,.vids{margin-inline:0}.map{border-radius:18px;overflow:hidden}.tabs{padding:0}}
 @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
 </style>
@@ -317,7 +330,7 @@ body.busy .status::after,body.busy #geoNote::after{animation:bob 1s ease-in-out 
 <body>
 <main class="app">
   <header class="brand"><div class="logo"><svg class="pal" viewBox="0 0 64 80" aria-hidden="true"><path d="M32 4C18 4 7 15 7 29c0 19 25 45 25 45s25-26 25-45C57 15 46 4 32 4z" fill="var(--pin)"/><ellipse cx="18.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><ellipse cx="45.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><circle cx="24" cy="28" r="3.4" fill="var(--face)"/><circle cx="40" cy="28" r="3.4" fill="var(--face)"/><circle cx="25.3" cy="26.8" r="1.1" fill="#fff"/><circle cx="41.3" cy="26.8" r="1.1" fill="#fff"/><path d="M26.5 36.5q5.5 4.6 11 0" stroke="var(--face)" stroke-width="2.6" fill="none" stroke-linecap="round"/></svg><h1 dir="ltr">FeedTrip</h1></div>
-    <div class="hdr"><span class="count" id="ver">v1.12</span><button class="addbtn" id="addBtn" type="button" aria-expanded="false" aria-controls="addBox" aria-label="הוספת קישור לסרטון"><span aria-hidden="true">+</span></button></div></header>
+    <div class="hdr"><span class="count" id="ver">v1.13</span><button class="addbtn" id="addBtn" type="button" aria-expanded="false" aria-controls="addBox" aria-label="הוספת קישור לסרטון"><span aria-hidden="true">+</span></button></div></header>
 
 
   <div class="addbox" id="addBox" hidden>
@@ -1168,13 +1181,16 @@ function placeHTML(p, i, city, inFolder){
   const c = catOf(p);
   const credit = p.img ? `<a class="credit" href="${esc(p.imgSrc)}" target="_blank" rel="noopener" data-stop>${p.imgFrom === "commons" ? `${p.imgNear ? "צילום מהסביבה" : "תמונה"} · ויקישיתוף${p.imgBy ? " · " + esc(p.imgBy) : ""}` : p.imgBy ? "תמונה: גוגל · " + esc(p.imgBy) : "תמונה: ויקיפדיה"}</a>` : "";
   const line = [`<span class="cat-inline cat-${c}">${catIcon(c)}${CATS[c].label}</span>`, inFolder && p.city ? esc(HE_CITY[p.city] || p.city) : "", areaOf(p) ? esc(areaOf(p)) : (p.neighborhood ? esc(p.neighborhood) : ""), p.price ? esc(p.price) : ""].filter(Boolean).join(" · ");
-  return `<li class="place ${state.sel===i?"sel":""}" data-i="${i}">
-    <div class="thumb cat-${c}">${p.img ? `<img src="${esc(p.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : catIcon(c, "big")}<span class="num">${i+1}</span></div>
+  const open = state.open === p;
+  return `<li class="place ${state.sel===i?"sel":""} ${open?"open":""}" data-i="${i}" aria-expanded="${open}">
+    <div class="thumb cat-${c}">${p.img ? `<img src="${esc(p.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : catIcon(c, "big")}<span class="num">${i+1}</span>
+      <button class="mapbtn" type="button" data-showmap="${i}" data-stop aria-label="הצגת ${esc(p.name)} במפה"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4.5 3.5 6.5v13L9 17.5l6 2 5.5-2v-13L15 6.5z"/><path d="M9 4.5v13M15 6.5v13"/></svg></button></div>
     <div class="body">
+      ${open && p.img ? `<img class="bigimg" src="${esc(p.img)}" alt="${esc(p.name)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}
       <h3>${esc(p.name)}</h3>${p.local && p.local!==p.name?`<div class="local">${esc(p.local)}</div>`:""}
       <div class="line">${line}</div>
       ${p.rating?`<div class="score">★ ${(+p.rating).toFixed(1)} <small>(${p.ratingCount||0} ביקורות בגוגל)</small></div>`:""}
-      ${p.why?`<p class="why">${esc(p.why)}</p>`:""}${p.dish?`<div class="sub">להזמין: ${esc(p.dish)}</div>`:""}
+      ${p.why?`<p class="why">${esc(p.why)}</p>`:""}${p.why && p.why.length > 70 && !open ? `<span class="more">להמשך קריאה</span>` : ""}${p.dish?`<div class="sub">להזמין: ${esc(p.dish)}</div>`:""}
       ${p.from === "speech" || p.from === "screen" ? `<span class="tag-src">${p.from === "speech" ? "נאמר בסרטון" : "הופיע על המסך"}</span>` : ""}
       <div class="row acts"><a class="btn small" href="${openOne(p, city)}" target="_blank" rel="noopener" data-stop>ניווט</a>
         ${inFolder ? `<button class="small ghost" data-remove="${i}" data-stop>הסר</button>` : `${f ? `<span class="saved">✓ ${esc(f.name)}</span><button class="small ghost" data-save="${i}" data-stop>+ עוד תיקייה</button>` : `<button class="small primary-link" data-save="${i}" data-stop>+ שמור</button>`}<button class="small ghost" data-del="${i}" data-stop aria-label="מחק את ${esc(p.name)} מהפיד">מחק</button>`}${credit}</div>
@@ -1236,7 +1252,7 @@ function render(){
   const mapPlaces = state.catFilter ? shown.map(([p]) => p) : places;
   const src = sel ? embedOne(sel, sel.city || city) : embedAll(mapPlaces, city, mode);
   if ($("#gmap").dataset.src !== src) { $("#gmap").src = src; $("#gmap").dataset.src = src; }
-  $("#mapLabel").textContent = sel ? `${state.sel+1}. ${sel.name}` : (mode === "simple" ? "לחץ על מקום ברשימה כדי לראות אותו במפה" : (places.length > 1 ? "כל המקומות, לפי סדר המסלול" : ""));
+  $("#mapLabel").textContent = sel ? `${state.sel+1}. ${sel.name}` : (mode === "simple" ? "סמל המפה שעל תמונת המקום מראה אותו כאן" : (places.length > 1 ? "כל המקומות, לפי סדר המסלול" : ""));
   $("#showAll").hidden = !sel;
   $("#openG").href = sel ? openOne(sel, sel.city || city) : openRoute(places, city);
 
@@ -1263,7 +1279,7 @@ function renderTabs(r){
 }
 
 document.addEventListener("click", e => {
-  const t = e.target.closest("[data-mymaps],[data-catf],[data-ocr],[data-tab],[data-save],[data-remove],[data-del],[data-folder],[data-pick],[data-days],[data-share],.place,#addAll,[data-video],[data-delvideo],#showAll,#backFolders,#delFolderAsk,#delFolderYes,#delFolderNo,#sheetClose,#sheet");
+  const t = e.target.closest("[data-showmap],[data-mymaps],[data-catf],[data-ocr],[data-tab],[data-save],[data-remove],[data-del],[data-folder],[data-pick],[data-days],[data-share],.place,#addAll,[data-video],[data-delvideo],#showAll,#backFolders,#delFolderAsk,#delFolderYes,#delFolderNo,#sheetClose,#sheet");
   if (!t) return;
   if (t.id === "sheet") { if (e.target === t) { state.pick = null; renderSheet(); } return; }
   if (t.id === "sheetClose") { state.pick = null; renderSheet(); return; }
@@ -1292,7 +1308,12 @@ document.addEventListener("click", e => {
     state.days[ctx] = Math.max(1, Math.min(list.length, cur + +step));
     render(); return;
   }
-  if (t.matches(".place") && !e.target.closest("[data-stop]")) { const i = +t.dataset.i; state.sel = state.sel === i ? null : i; render(); $(".map").scrollIntoView({behavior:"smooth", block:"nearest"}); }
+  if (t.matches("[data-showmap]")) { const i = +t.dataset.showmap; state.sel = state.sel === i ? null : i; render(); $(".map").scrollIntoView({behavior:"smooth", block:"nearest"}); return; }
+  // Tapping a place opens it for reading, in place; the map does not move.
+  if (t.matches(".place") && !e.target.closest("[data-stop]")) {
+    const list = (state.tab === "folders" ? state.folders.find(f => f.id === state.folder)?.places : state.res?.places) || [];
+    const p = list[+t.dataset.i]; state.open = state.open === p ? null : p; render(); return;
+  }
 });
 
 /* ---- reset everything stored on this device ---- */
