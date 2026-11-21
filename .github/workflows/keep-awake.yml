@@ -1,0 +1,16 @@
+# Supabase pauses free projects after 7 days without use. A tiny read every 3 days keeps the server awake.
+name: keep-awake
+on:
+  schedule:
+    - cron: "17 6 */3 * *"
+  workflow_dispatch:
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Touch the database
+        env:
+          ANON: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtsemJhb25pYmp5a3R6eGhramNnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0MzEzMTcsImV4cCI6MjEwOTAwNzMxN30.Y-lq_5AhnQ5oHWcjms502FJT2rbTNx8qhS-SS-4hzXE"
+        run: |
+          curl -fsS "https://klzbaonibjyktzxhkjcg.supabase.co/rest/v1/caption_cache?select=video_key&limit=1" \
+            -H "apikey: $ANON" -H "Authorization: Bearer $ANON"
