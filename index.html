@@ -322,7 +322,15 @@ body.busy .status::after,body.busy #geoNote::after{animation:bob 1s ease-in-out 
 .place.sel .thumb{box-shadow:0 0 0 2.5px var(--surface),0 0 0 5px var(--pin)}
 .place.open .why{-webkit-line-clamp:unset;display:block}
 .more{font-size:13px;color:var(--muted);text-decoration:underline;text-underline-offset:3px}
-.bigimg{display:block;width:100%;height:190px;object-fit:cover;border-radius:16px;margin:0 0 8px}
+.place.wide{grid-template-columns:1fr}
+.bigwrap.noimg .bigimg{display:none}
+.bigwrap.noimg .corner{position:static}
+.bigwrap{position:relative;margin:0 0 8px}
+.bigimg{display:block;width:100%;height:210px;object-fit:cover;border-radius:18px}
+.corner{position:absolute;left:10px;bottom:10px;display:flex;align-items:center;gap:6px}
+.corner .num,.corner .mapbtn{position:static;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+.corner .num{min-width:28px;height:28px;font-size:13px}
+.place.wide.sel .bigimg{box-shadow:0 0 0 2.5px var(--surface),0 0 0 5px var(--pin)}
 @media (min-width:600px){.card,.tabs,.catbar,.vids{margin-inline:0}.map{border-radius:18px;overflow:hidden}.tabs{padding:0}}
 @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
 </style>
@@ -330,7 +338,7 @@ body.busy .status::after,body.busy #geoNote::after{animation:bob 1s ease-in-out 
 <body>
 <main class="app">
   <header class="brand"><div class="logo"><svg class="pal" viewBox="0 0 64 80" aria-hidden="true"><path d="M32 4C18 4 7 15 7 29c0 19 25 45 25 45s25-26 25-45C57 15 46 4 32 4z" fill="var(--pin)"/><ellipse cx="18.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><ellipse cx="45.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><circle cx="24" cy="28" r="3.4" fill="var(--face)"/><circle cx="40" cy="28" r="3.4" fill="var(--face)"/><circle cx="25.3" cy="26.8" r="1.1" fill="#fff"/><circle cx="41.3" cy="26.8" r="1.1" fill="#fff"/><path d="M26.5 36.5q5.5 4.6 11 0" stroke="var(--face)" stroke-width="2.6" fill="none" stroke-linecap="round"/></svg><h1 dir="ltr">FeedTrip</h1></div>
-    <div class="hdr"><span class="count" id="ver">v1.13</span><button class="addbtn" id="addBtn" type="button" aria-expanded="false" aria-controls="addBox" aria-label="הוספת קישור לסרטון"><span aria-hidden="true">+</span></button></div></header>
+    <div class="hdr"><span class="count" id="ver">v1.14</span><button class="addbtn" id="addBtn" type="button" aria-expanded="false" aria-controls="addBox" aria-label="הוספת קישור לסרטון"><span aria-hidden="true">+</span></button></div></header>
 
 
   <div class="addbox" id="addBox" hidden>
@@ -1182,11 +1190,14 @@ function placeHTML(p, i, city, inFolder){
   const credit = p.img ? `<a class="credit" href="${esc(p.imgSrc)}" target="_blank" rel="noopener" data-stop>${p.imgFrom === "commons" ? `${p.imgNear ? "צילום מהסביבה" : "תמונה"} · ויקישיתוף${p.imgBy ? " · " + esc(p.imgBy) : ""}` : p.imgBy ? "תמונה: גוגל · " + esc(p.imgBy) : "תמונה: ויקיפדיה"}</a>` : "";
   const line = [`<span class="cat-inline cat-${c}">${catIcon(c)}${CATS[c].label}</span>`, inFolder && p.city ? esc(HE_CITY[p.city] || p.city) : "", areaOf(p) ? esc(areaOf(p)) : (p.neighborhood ? esc(p.neighborhood) : ""), p.price ? esc(p.price) : ""].filter(Boolean).join(" · ");
   const open = state.open === p;
-  return `<li class="place ${state.sel===i?"sel":""} ${open?"open":""}" data-i="${i}" aria-expanded="${open}">
-    <div class="thumb cat-${c}">${p.img ? `<img src="${esc(p.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : catIcon(c, "big")}<span class="num">${i+1}</span>
-      <button class="mapbtn" type="button" data-showmap="${i}" data-stop aria-label="הצגת ${esc(p.name)} במפה"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4.5 3.5 6.5v13L9 17.5l6 2 5.5-2v-13L15 6.5z"/><path d="M9 4.5v13M15 6.5v13"/></svg></button></div>
+  const mapBtn = `<button class="mapbtn" type="button" data-showmap="${i}" data-stop aria-label="הצגת ${esc(p.name)} במפה"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4.5 3.5 6.5v13L9 17.5l6 2 5.5-2v-13L15 6.5z"/><path d="M9 4.5v13M15 6.5v13"/></svg></button>`;
+  // Open with a photo: one big photo, with the number and the map button in its bottom-left corner.
+  const wide = open && p.img;
+  return `<li class="place ${state.sel===i?"sel":""} ${open?"open":""} ${wide?"wide":""}" data-i="${i}" aria-expanded="${open}">
+    ${wide ? "" : `<div class="thumb cat-${c}">${p.img ? `<img src="${esc(p.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : catIcon(c, "big")}<span class="num">${i+1}</span>
+      ${mapBtn}</div>`}
     <div class="body">
-      ${open && p.img ? `<img class="bigimg" src="${esc(p.img)}" alt="${esc(p.name)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}
+      ${wide ? `<div class="bigwrap"><img class="bigimg" src="${esc(p.img)}" alt="${esc(p.name)}" loading="lazy" referrerpolicy="no-referrer" onerror="this.closest('.bigwrap').classList.add('noimg')"><span class="corner"><span class="num">${i+1}</span>${mapBtn}</span></div>` : ""}
       <h3>${esc(p.name)}</h3>${p.local && p.local!==p.name?`<div class="local">${esc(p.local)}</div>`:""}
       <div class="line">${line}</div>
       ${p.rating?`<div class="score">★ ${(+p.rating).toFixed(1)} <small>(${p.ratingCount||0} ביקורות בגוגל)</small></div>`:""}
