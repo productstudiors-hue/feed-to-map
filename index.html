@@ -361,7 +361,10 @@ body.busy .hello,body.busy #status,body.busy #geoNote,body.busy #homeChat{displa
 .chatadd{display:flex;align-items:center;gap:12px;width:100%;margin:12px 0 0;padding:12px 14px;border-radius:20px;border:1.5px dashed var(--line);background:transparent;text-align:right;color:var(--ink);font:inherit}
 .chatadd>span:not(.plus){flex:1;min-width:0;display:flex;flex-direction:column}
 .chatadd .plus{flex:0 0 30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--ink);color:var(--paper);font-size:20px}
-.chat-pal{width:40px;height:40px;flex:0 0 auto}
+.chat-pal{flex:0 0 34px;width:34px;height:43px}
+.chatadd{white-space:normal;justify-content:flex-start;box-sizing:border-box;max-width:100%;font-weight:400}
+.chatadd b{font-weight:600}.chatadd .sub{white-space:normal;line-height:1.4;margin-top:2px}
+.chatbox .row{flex-wrap:wrap}.chatbox .row .btn,.chatbox .row button{white-space:nowrap}
 .chatbox{margin:12px 0 0;background:var(--surface);border-radius:22px;padding:16px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:10px}
 .chathead{display:flex;gap:12px;align-items:flex-start}.chathead p{margin:2px 0 0}
 .chatbox textarea{width:100%;box-sizing:border-box;font:inherit;font-size:14.5px;border:0;background:var(--soft);border-radius:14px;padding:12px;color:var(--ink);resize:vertical}
@@ -403,7 +406,7 @@ body.busy .hello,body.busy #status,body.busy #geoNote,body.busy #homeChat{displa
 <body>
 <main class="app">
   <header class="brand"><div class="logo"><svg class="pal" viewBox="0 0 64 80" aria-hidden="true"><path d="M32 4C18 4 7 15 7 29c0 19 25 45 25 45s25-26 25-45C57 15 46 4 32 4z" fill="var(--pin)"/><ellipse cx="18.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><ellipse cx="45.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><circle cx="24" cy="28" r="3.4" fill="var(--face)"/><circle cx="40" cy="28" r="3.4" fill="var(--face)"/><circle cx="25.3" cy="26.8" r="1.1" fill="#fff"/><circle cx="41.3" cy="26.8" r="1.1" fill="#fff"/><path d="M26.5 36.5q5.5 4.6 11 0" stroke="var(--face)" stroke-width="2.6" fill="none" stroke-linecap="round"/></svg><h1 dir="ltr">FeedTrip</h1></div>
-    <div class="hdr"><span class="count" id="ver">v1.28</span><button class="addbtn" id="addBtn" type="button" aria-expanded="false" aria-controls="addBox" aria-label="הוספת קישור לסרטון"><span aria-hidden="true">+</span></button></div></header>
+    <div class="hdr"><span class="count" id="ver">v1.29</span><button class="addbtn" id="addBtn" type="button" aria-expanded="false" aria-controls="addBox" aria-label="הוספת קישור לסרטון"><span aria-hidden="true">+</span></button></div></header>
 
 
   <div class="addbox" id="addBox" hidden>
@@ -991,7 +994,7 @@ function chatBoxHTML(ctx, places, city){
       <textarea id="chatIn" rows="8" placeholder="הדביקו כאן את המסלול מהצ'ט. למשל:&#10;יום 1: העיר העתיקה&#10;09:00 - Colosseum - כרטיס מראש&#10;13:00 - Roscioli - צהריים">${esc(plan?.text || "")}</textarea>
       <div class="row"><button class="primary-link" type="button" data-chatsave="${ctx}">בניית המסלול</button><button class="small ghost" type="button" data-chatcancel>ביטול</button></div></div>`;
   }
-  if (!plan) return `<button class="chatadd" data-chatedit="${ctx}">${pinny("wink", "chat-pal")}<span><b>יש לכם מסלול מצ'ט?</b><span class="sub">בנו מסלול ב-ChatGPT או ב-Claude עם המקומות מהסרטונים, והדביקו אותו כאן</span></span><span class="plus">+</span></button>`;
+  if (!plan) return `<button class="chatadd" data-chatedit="${ctx}">${pinny("wink", "chat-pal")}<span><b>יש לכם מסלול מצ'ט?</b><span class="sub">בנו מסלול ב-ChatGPT או Claude עם המקומות מהסרטונים, והדביקו כאן</span></span><span class="plus">+</span></button>`;
   const src = state.routeSrc[ctx] || "chat";
   return `<div class="seg" role="group" aria-label="מקור המסלול"><button data-routesrc="${ctx}|chat" aria-pressed="${src === "chat"}">💬 מצ'ט + סרטונים</button><button data-routesrc="${ctx}|auto" aria-pressed="${src !== "chat"}">🎬 רק מהסרטונים</button></div>`;
 }
@@ -1651,7 +1654,9 @@ function renderFeedBar(){
 
 function renderHomeChat(){
   const el = $("#homeChat"); if (!el) return;
-  if (!state.homeChat) { el.innerHTML = `<button class="chatadd" id="homeChatOpen" type="button">${pinny("wink", "chat-pal")}<span><b>יש לכם מסלול מצ'ט?</b><span class="sub">הדביקו מסלול מ-ChatGPT או מ-Claude, ואשלב בו את המקומות מהסרטונים</span></span><span class="plus">+</span></button>`; return; }
+  // on a route screen the same button is already inside the route
+  if (state.tab === "route" || (state.tab === "folders" && state.folder && state.folderTab === "route")) { el.innerHTML = ""; return; }
+  if (!state.homeChat) { el.innerHTML = `<button class="chatadd" id="homeChatOpen" type="button">${pinny("wink", "chat-pal")}<span><b>יש לכם מסלול מצ'ט?</b><span class="sub">הדביקו מסלול מ-ChatGPT או Claude, ואשלב בו את הסרטונים</span></span><span class="plus">+</span></button>`; return; }
   const r = state.res, prompt = r ? chatPrompt(r.places, r.city, Math.max(1, defaultDays(r.places))) : chatPrompt([], "", 3).replace("ב" + "היעד", "ב___").replace("ל־3 ימים", "ל־___ ימים");
   el.innerHTML = `<div class="chatbox"><div class="chathead">${pinny("happy", "chat-pal")}<div><b>מסלול מצ'ט</b><p class="sub">${r ? `הבקשה כוללת את המקומות מ"${esc(cleanTitle(r.title))}".` : "השלימו בבקשה את היעד ומספר הימים."} את התשובה מהצ'ט הדביקו כאן, ואשאל לאיזה טיול לצרף אותה.</p></div></div>
     <div class="row"><a class="btn small" target="_blank" rel="noopener" href="https://chatgpt.com/?q=${encodeURIComponent(prompt)}">פתיחה ב-ChatGPT</a><a class="btn small" target="_blank" rel="noopener" href="https://claude.ai/new?q=${encodeURIComponent(prompt)}">פתיחה ב-Claude</a><button class="small" type="button" data-chatcopy="${esc(encodeURIComponent(prompt))}">העתקת הבקשה</button></div>
