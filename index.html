@@ -340,7 +340,8 @@ body.infolders #resetBox{order:3}
 /* ---- scanning: Pinny reads the video ---- */
 .scancard{display:none;flex-direction:column;align-items:center;text-align:center;gap:12px;padding:30px 12px 18px}
 body.busy .scancard{display:flex}
-body.busy .hello,body.busy #status,body.busy #geoNote{display:none!important}
+body.busy .hello,body.busy #status,body.busy #geoNote,body.busy #homeChat{display:none!important}
+.homechat{margin:14px 0 4px}.homechat .chatadd{margin:0;background:var(--surface);box-shadow:var(--shadow);border-style:solid;border-color:transparent}.homechat .chatbox{margin:0}
 .scanart{position:relative;width:150px;height:170px}
 .scanvid{position:absolute;inset:0 24px 10px 0;border-radius:20px;overflow:hidden;background:linear-gradient(160deg,var(--sel),var(--soft));box-shadow:var(--shadow);transform:rotate(-5deg)}
 .scanvid i:not(.beam){position:absolute;right:14px;height:9px;border-radius:9px;background:var(--surface);opacity:.9}
@@ -402,7 +403,7 @@ body.busy .hello,body.busy #status,body.busy #geoNote{display:none!important}
 <body>
 <main class="app">
   <header class="brand"><div class="logo"><svg class="pal" viewBox="0 0 64 80" aria-hidden="true"><path d="M32 4C18 4 7 15 7 29c0 19 25 45 25 45s25-26 25-45C57 15 46 4 32 4z" fill="var(--pin)"/><ellipse cx="18.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><ellipse cx="45.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><circle cx="24" cy="28" r="3.4" fill="var(--face)"/><circle cx="40" cy="28" r="3.4" fill="var(--face)"/><circle cx="25.3" cy="26.8" r="1.1" fill="#fff"/><circle cx="41.3" cy="26.8" r="1.1" fill="#fff"/><path d="M26.5 36.5q5.5 4.6 11 0" stroke="var(--face)" stroke-width="2.6" fill="none" stroke-linecap="round"/></svg><h1 dir="ltr">FeedTrip</h1></div>
-    <div class="hdr"><span class="count" id="ver">v1.27</span><button class="addbtn" id="addBtn" type="button" aria-expanded="false" aria-controls="addBox" aria-label="הוספת קישור לסרטון"><span aria-hidden="true">+</span></button></div></header>
+    <div class="hdr"><span class="count" id="ver">v1.28</span><button class="addbtn" id="addBtn" type="button" aria-expanded="false" aria-controls="addBox" aria-label="הוספת קישור לסרטון"><span aria-hidden="true">+</span></button></div></header>
 
 
   <div class="addbox" id="addBox" hidden>
@@ -439,6 +440,7 @@ body.busy .hello,body.busy #status,body.busy #geoNote{display:none!important}
     <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
   </section>
   <section class="feedbar" id="feedBar" hidden aria-label="הפיד שלי"></section>
+  <section class="homechat" id="homeChat" aria-label="מסלול מצ'ט"></section>
   <p class="status" id="geoNote" hidden></p>
   <section class="card" id="card" hidden>
     <div class="head">
@@ -570,7 +572,7 @@ function loadFeed(){
 }
 const vidKey = v => (v.source?.url || v.title || "").replace(/\?.*$/, "");
 const saveFeed = () => store.set("ftm_feed", state.feed);
-let state = { feed: [], res: null, tab: "list", sel: null, folders: loadFolders(), folder: null, days: {}, pick: null, routeSrc: {}, chatEdit: null, chatPick: null };
+let state = { feed: [], res: null, tab: "list", sel: null, folders: loadFolders(), folder: null, days: {}, pick: null, routeSrc: {}, chatEdit: null, chatPick: null, homeChat: false };
 state.feed = loadFeed(); state.res = state.feed[0] || null;
 const saveFolders = () => store.set("ftm_folders", state.folders);
 
@@ -631,9 +633,26 @@ function renderChatSheet(){
     <h3 id="chatT">לאיזה טיול להוסיף את המסלול מהצ'ט?</h3>
     <p class="sub" style="margin:0">💬 ${days.length} ימים, ${days.reduce((a, d) => a + d.stops.length, 0)} עצירות. המקומות מהסרטונים ישולבו בו.</p>
     ${trips.length ? `<ul class="folders">${trips.map(t => `<li><button class="fbtn" data-chattrip="${esc(t.ctx)}"><span><b>${esc(t.label)}</b> <span class="sub">${esc(t.sub)}</span></span><span aria-hidden="true">‹</span></button></li>`).join("")}</ul>`
-      : `<p>עוד אין טיול לחבר אליו את המסלול. שתפו קודם סרטון מהיעד.</p>`}
+      : ""}
+    <form id="chatNewTrip" class="newf"><label for="ctName">${trips.length ? "או טיול חדש" : "טיול חדש: לאן?"}</label>
+      <div class="scan"><input id="ctName" placeholder="למשל: רומא" style="direction:rtl;text-align:right;font-family:var(--f-body)" required><button class="primary" type="submit">צור טיול</button></div></form>
     <button class="small" id="sheetClose" type="button" style="align-self:flex-start">ביטול</button></div>`;
 }
+// a new trip from the chat alone: a folder named after the place, with the chat's route
+document.addEventListener("submit", e => {
+  if (e.target.id !== "chatNewTrip") return;
+  e.preventDefault();
+  const name = $("#ctName").value.trim(); if (!name || !state.chatPick) return;
+  const city = Object.keys(HE_CITY).find(k => HE_CITY[k] === name) || name;
+  let f = state.folders.find(x => x.name === name);
+  if (!f) { f = { id: "f" + Date.now().toString(36), name, places: [] }; state.folders.push(f); saveFolders(); }
+  const txt = state.chatPick; state.chatPick = null; renderSheet();
+  state.tab = "folders"; state.folder = f.id; state.folderTab = "route";
+  const days = parseChatRoute(txt);
+  if (days.length) { const ctx = "f:" + f.id; saveChatPlan(ctx, { text: txt, days, city, at: Date.now() }); state.routeSrc[ctx] = "chat";
+    setStatus(`נפתח טיול חדש "${name}" עם ${days.length} ימים מהצ'ט. סרטונים שתשמרו לתיקייה הזו ישתלבו במסלול.`); }
+  render();
+});
 function renderSheet(){
   if (state.chatPick) return renderChatSheet();
   const el = $("#sheet");
@@ -958,7 +977,7 @@ function mergeChat(ctx, places, city){
   return { days, extra, rest: [], hotel: null, byArea: true, pending: plan.days.flatMap(d => d.stops).filter(s => !s.lat && !s.geoTried).length };
 }
 function locateChat(ctx, city){
-  const plan = chatPlan(ctx); if (!plan || !city) return;
+  const plan = chatPlan(ctx); city ||= plan?.city; if (!plan || !city) return;
   const stops = plan.days.flatMap(d => d.stops);
   if (!stops.some(s => !s.lat && !s.geoTried)) return;
   locatePlaces(stops, city, () => { const now = chatPlan(ctx); if (now && now.text === plan.text) { saveChatPlan(ctx, plan); render(); } });
@@ -1630,7 +1649,17 @@ function renderFeedBar(){
     }).join("")}</ul>`;
 }
 
+function renderHomeChat(){
+  const el = $("#homeChat"); if (!el) return;
+  if (!state.homeChat) { el.innerHTML = `<button class="chatadd" id="homeChatOpen" type="button">${pinny("wink", "chat-pal")}<span><b>יש לכם מסלול מצ'ט?</b><span class="sub">הדביקו מסלול מ-ChatGPT או מ-Claude, ואשלב בו את המקומות מהסרטונים</span></span><span class="plus">+</span></button>`; return; }
+  const r = state.res, prompt = r ? chatPrompt(r.places, r.city, Math.max(1, defaultDays(r.places))) : chatPrompt([], "", 3).replace("ב" + "היעד", "ב___").replace("ל־3 ימים", "ל־___ ימים");
+  el.innerHTML = `<div class="chatbox"><div class="chathead">${pinny("happy", "chat-pal")}<div><b>מסלול מצ'ט</b><p class="sub">${r ? `הבקשה כוללת את המקומות מ"${esc(cleanTitle(r.title))}".` : "השלימו בבקשה את היעד ומספר הימים."} את התשובה מהצ'ט הדביקו כאן, ואשאל לאיזה טיול לצרף אותה.</p></div></div>
+    <div class="row"><a class="btn small" target="_blank" rel="noopener" href="https://chatgpt.com/?q=${encodeURIComponent(prompt)}">פתיחה ב-ChatGPT</a><a class="btn small" target="_blank" rel="noopener" href="https://claude.ai/new?q=${encodeURIComponent(prompt)}">פתיחה ב-Claude</a><button class="small" type="button" data-chatcopy="${esc(encodeURIComponent(prompt))}">העתקת הבקשה</button></div>
+    <textarea id="homeChatIn" rows="7" placeholder="הדביקו כאן את המסלול מהצ'ט. למשל:&#10;יום 1: העיר העתיקה&#10;09:00 - Colosseum&#10;13:00 - Roscioli - צהריים"></textarea>
+    <div class="row"><button class="primary-link" type="button" id="homeChatGo">המשך</button><button class="small ghost" type="button" id="homeChatClose">ביטול</button></div></div>`;
+}
 function render(){
+  renderHomeChat();
   document.body.classList.toggle("has-feed", state.feed.length > 0);
   document.body.classList.toggle("infolders", state.tab === "folders");
   renderFeedBar();
@@ -1686,6 +1715,7 @@ function render(){
       ? `<div class="seg ftabs" role="tablist"><button data-ftab="list" aria-pressed="${ft === "list"}">המקומות <span class="n">${places.length}</span></button><button data-ftab="route" aria-pressed="${ft === "route"}">מסלול</button></div>`
         + (ft === "route" ? routeHTML("f:" + folder.id, places, null, city, folder.name)
           : `${catbar}${shareRow(shareText("list", folder.name, shown.map(([p]) => p), city))}<ul class="list">${shown.map(([p,i])=>placeHTML(p,i,p.city,true)).join("")}</ul>`)
+      : chatPlan("f:" + folder.id) ? routeHTML("f:" + folder.id, places, null, chatPlan("f:" + folder.id).city || city, folder.name)
       : emptyHTML("sleepy", "התיקייה ריקה", "אפשר להוסיף לה מקומות מכל סרטון בפיד."));
   } else if (state.tab === "list") {
     const savedN = places.filter(p => folderOf(withCity(p))).length;
@@ -1705,10 +1735,14 @@ function renderTabs(r){
 }
 
 document.addEventListener("click", e => {
-  const t = e.target.closest("[data-chatedit],[data-chatsave],[data-chatcancel],[data-chatdel],[data-chatcopy],[data-routesrc],[data-chattrip],[data-ftab],[data-routefocus],[data-routemode],[data-showmap],[data-mymaps],[data-catf],[data-ocr],[data-tab],[data-save],[data-remove],[data-del],[data-folder],[data-pick],[data-days],[data-share],.place,#addAll,[data-video],[data-delvideo],#showAll,#backFolders,#delFolderAsk,#delFolderYes,#delFolderNo,#sheetClose,#sheet");
+  const t = e.target.closest("#homeChatOpen,#homeChatClose,#homeChatGo,[data-chatedit],[data-chatsave],[data-chatcancel],[data-chatdel],[data-chatcopy],[data-routesrc],[data-chattrip],[data-ftab],[data-routefocus],[data-routemode],[data-showmap],[data-mymaps],[data-catf],[data-ocr],[data-tab],[data-save],[data-remove],[data-del],[data-folder],[data-pick],[data-days],[data-share],.place,#addAll,[data-video],[data-delvideo],#showAll,#backFolders,#delFolderAsk,#delFolderYes,#delFolderNo,#sheetClose,#sheet");
   if (!t) return;
   if (t.id === "sheet") { if (e.target === t) { state.pick = null; state.chatPick = null; renderSheet(); } return; }
   if (t.id === "sheetClose") { state.pick = null; state.chatPick = null; renderSheet(); return; }
+  if (t.id === "homeChatOpen") { state.homeChat = true; renderHomeChat(); setTimeout(() => $("#homeChatIn")?.focus(), 30); return; }
+  if (t.id === "homeChatClose") { state.homeChat = false; renderHomeChat(); return; }
+  if (t.id === "homeChatGo") { const txt = $("#homeChatIn").value; if (!parseChatRoute(txt).length) { setStatus("לא מצאתי בטקסט ימים ועצירות. כל עצירה צריכה להיות בשורה נפרדת, ואפשר לפתוח כל יום ב\"יום 1:\".", true); return; }
+    state.homeChat = false; state.pick = null; state.chatPick = txt; renderSheet(); renderHomeChat(); return; }
   if (t.matches("[data-chatedit]")) { state.chatEdit = t.dataset.chatedit; render(); setTimeout(() => $("#chatIn")?.focus(), 30); return; }
   if (t.matches("[data-chatcancel]")) { state.chatEdit = null; render(); return; }
   if (t.matches("[data-chatcopy]")) { const txt = decodeURIComponent(t.dataset.chatcopy); (navigator.clipboard?.writeText(txt) || Promise.reject()).then(() => setStatus("הבקשה הועתקה. הדביקו אותה בצ'ט, ואת התשובה הדביקו כאן."), () => setStatus("לא הצלחתי להעתיק. אפשר ללחוץ על \"פתיחה ב-ChatGPT\".", true)); return; }
@@ -1767,7 +1801,7 @@ $("#resetAsk").onclick = () => { $("#resetConfirm").hidden = false; $("#resetAsk
 $("#resetNo").onclick = () => { $("#resetConfirm").hidden = true; $("#resetAsk").hidden = false; };
 $("#resetYes").onclick = () => {
   try { Object.keys(localStorage).filter(k => k.startsWith("ftm_")).forEach(k => localStorage.removeItem(k)); } catch {}
-  state = { feed: [], res: null, tab: "list", sel: null, folders: [], folder: null, days: {}, pick: null, routeSrc: {}, chatEdit: null, chatPick: null };
+  state = { feed: [], res: null, tab: "list", sel: null, folders: [], folder: null, days: {}, pick: null, routeSrc: {}, chatEdit: null, chatPick: null, homeChat: false };
   $("#url").value = ""; $("#gmap").removeAttribute("src"); delete $("#gmap").dataset.src;
   $("#resetConfirm").hidden = true; $("#resetAsk").hidden = false;
   setStatus("ניקיתי הכל. מתחילים מחדש!");
