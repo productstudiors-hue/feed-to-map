@@ -398,7 +398,7 @@ body.busy .hello,body.busy #status,body.busy #geoNote{display:none!important}
 <body>
 <main class="app">
   <header class="brand"><div class="logo"><svg class="pal" viewBox="0 0 64 80" aria-hidden="true"><path d="M32 4C18 4 7 15 7 29c0 19 25 45 25 45s25-26 25-45C57 15 46 4 32 4z" fill="var(--pin)"/><ellipse cx="18.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><ellipse cx="45.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><circle cx="24" cy="28" r="3.4" fill="var(--face)"/><circle cx="40" cy="28" r="3.4" fill="var(--face)"/><circle cx="25.3" cy="26.8" r="1.1" fill="#fff"/><circle cx="41.3" cy="26.8" r="1.1" fill="#fff"/><path d="M26.5 36.5q5.5 4.6 11 0" stroke="var(--face)" stroke-width="2.6" fill="none" stroke-linecap="round"/></svg><h1 dir="ltr">FeedTrip</h1></div>
-    <div class="hdr"><span class="count" id="ver">v1.22</span><button class="addbtn" id="addBtn" type="button" aria-expanded="false" aria-controls="addBox" aria-label="הוספת קישור לסרטון"><span aria-hidden="true">+</span></button></div></header>
+    <div class="hdr"><span class="count" id="ver">v1.23</span><button class="addbtn" id="addBtn" type="button" aria-expanded="false" aria-controls="addBox" aria-label="הוספת קישור לסרטון"><span aria-hidden="true">+</span></button></div></header>
 
 
   <div class="addbox" id="addBox" hidden>
@@ -501,9 +501,16 @@ const cleanTitle = t => (String(t || "").split(/📍|\d\uFE0F?\u20E3|\s\d{1,2}[.
 function setStatus(t, err){ $("#status").textContent = t; $("#status").classList.toggle("err", !!err); }
 const extractUrl = s => (String(s||"").match(/https?:\/\/[^\s"'<>]+/) || [""])[0];
 
+// Links that are a place to stay (or a map pin), not a video: shared from Booking, Airbnb, Google Maps…
+const HOTEL_HOSTS = /(^|\.)(booking\.com|airbnb\.[a-z.]+|hotels\.com|expedia\.[a-z.]+|agoda\.com|tripadvisor\.[a-z.]+|trip\.com|maps\.app\.goo\.gl)$/i;
+function isHotelLink(link){
+  let u; try { u = new URL(link); } catch { return false; }
+  return HOTEL_HOSTS.test(u.hostname) || isGoogleMaps(u) || (/^goo\.gl$/i.test(u.hostname) && u.pathname.startsWith("/maps"));
+}
 async function scan(raw){
   const url = extractUrl(raw);
   if (!url) { setStatus("לא מצאתי קישור. הדבק קישור שמתחיל ב־https://", true); return; }
+  if (isHotelLink(url)) { setAddBox(false); $("#url").value = ""; openHotelSheet(url); return; }
   $("#url").value = url;
   $("#go").disabled = true; $("#bar").hidden = false; document.body.classList.add("busy"); $("#setup").innerHTML = "";
   setStatus("רגע, אני קורא את הסרטון ומחפש את המקומות…");
@@ -607,7 +614,37 @@ function removeVideo(v){
   saveFeed();
   state.res = state.feed[0] || null; state.sel = null; delete state.days.v;
 }
+// A hotel link came in: ask which trip it belongs to (a folder, or the video on screen), then add it to that route.
+function openHotelSheet(link){ state.pick = null; state.hotelPick = link; renderHotelSheet(); }
+function renderHotelSheet(){
+  const el = $("#sheet");
+  if (!state.hotelPick) { el.hidden = true; el.innerHTML = ""; return; }
+  const trips = state.folders.filter(f => f.places.length).map(f => ({ ctx: "f:" + f.id, label: `${flagOf(f.name)} ${f.name}`, sub: `${f.places.length} מקומות`, city: listCity(f.places) }));
+  if (state.res) trips.push({ ctx: "v", label: cleanTitle(state.res.title), sub: "הסרטון הפתוח", city: state.res.city || "" });
+  let host = ""; try { host = new URL(state.hotelPick).hostname.replace(/^www\./, ""); } catch {}
+  el.hidden = false;
+  el.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="hotelT">
+    <span class="grab" aria-hidden="true"></span>
+    <h3 id="hotelT">לאיזה טיול להוסיף את המלון?</h3>
+    <p class="sub" style="margin:0">${catIcon("stay")} קישור מ־${esc(host)}. כל יום במסלול של הטיול יתחיל ויסתיים בו.</p>
+    ${trips.length ? `<ul class="folders">${trips.map(t => `<li><button class="fbtn" data-hoteltrip="${esc(t.ctx)}" data-city="${esc(t.city)}"><span><b>${esc(t.label)}</b> <span class="sub">${esc(t.sub)}</span></span><span aria-hidden="true">‹</span></button></li>`).join("")}</ul>`
+      : `<p>עוד אין טיול לחבר אליו את המלון. שתפו קודם סרטון מהיעד, ואז את המלון.</p>`}
+    <button class="small" id="sheetClose" type="button" style="align-self:flex-start">ביטול</button>
+  </div>`;
+}
+async function addHotelTo(ctx, city){
+  const link = state.hotelPick; state.hotelPick = null; renderHotelSheet();
+  if (ctx.startsWith("f:")) { state.tab = "folders"; state.folder = ctx.slice(2); state.folderTab = "route"; } else { state.tab = "route"; state.folder = null; }
+  render();
+  setStatus("רגע, אני מחפש את המלון…");
+  const h = await hotelFromLink(link, city).catch(() => "retry");
+  if (!h || h === "retry") { setStatus(h === "retry" ? "אין חיבור כרגע. נסו שוב בעוד רגע." : "לא הצלחתי להבין איזה מלון זה מהקישור. אפשר לכתוב את שמו בכרטיס \"איפה אתם ישנים?\".", true); return; }
+  const all = routeHotels(); all[routeKey(ctx)] = h; store.set("ftm_hotels", all); delete state.days[ctx];
+  setStatus(`מעולה, כל יום במסלול יתחיל ויסתיים ב־${h.name}.`);
+  render();
+}
 function renderSheet(){
+  if (state.hotelPick) return renderHotelSheet();
   const el = $("#sheet");
   if (!state.pick) { el.hidden = true; el.innerHTML = ""; return; }
   const sug = suggestFolder(state.res);
@@ -928,9 +965,9 @@ function routeHTML(ctx, places, itinerary, city, title){
   const mine = routeHotel(ctx), fromList = !mine && places.find(p => catOf(p) === "stay" && p.lat);
   const base = mine || fromList;
   const hotelBox = state.hotelEdit === ctx
-    ? `<form class="hotelform" data-hotelform="${ctx}">${catIcon("stay")}<input id="hotelIn" placeholder="שם המלון, כתובת או קישור (Google Maps, Booking…)" value="${esc(mine?.name || "")}" required><button class="primary-link" type="submit">שמירה</button><button class="small ghost" type="button" data-hotelcancel>ביטול</button></form>`
+    ? `<form class="hotelform" data-hotelform="${ctx}">${catIcon("stay")}<input id="hotelIn" placeholder="שם, כתובת, או קישור/שיתוף מ-Booking או Google Maps" value="${esc(mine?.name || "")}" required><button class="primary-link" type="submit">שמירה</button><button class="small ghost" type="button" data-hotelcancel>ביטול</button></form>`
     : base ? `<div class="hotelrow cat-stay">${catIcon("stay")}<span><b>${esc(base.name)}</b><span class="sub">כל יום יוצא מכאן וחוזר לכאן${fromList ? " (מהרשימה)" : ""}</span></span><button class="small ghost" data-hoteledit="${ctx}">שינוי</button>${mine ? `<button class="small ghost" data-hoteldel="${ctx}">הסרה</button>` : ""}</div>`
-    : `<button class="hoteladd" data-hoteledit="${ctx}">${catIcon("stay")}<span><b>איפה אתם ישנים?</b><span class="sub">הוסיפו את המלון, וכל יום יתחיל ויסתיים בו</span></span><span class="plus">+</span></button>`;
+    : `<button class="hoteladd" data-hoteledit="${ctx}">${catIcon("stay")}<span><b>איפה אתם ישנים?</b><span class="sub">הוסיפו את המלון, או שתפו אותו מ-Booking או מ-Google Maps ישר לאפליקציה</span></span><span class="plus">+</span></button>`;
   const plan = currentDays(ctx, places, itinerary);
   const count = plan.days.length, mode = places.length >= 6 ? routeMode(ctx) : "full";
   const best = plan.days.find(d => d.best);
@@ -1631,7 +1668,8 @@ function renderTabs(r){
 document.addEventListener("submit", async e => {
   const f = e.target.closest("[data-hotelform]"); if (!f) return;
   e.preventDefault();
-  const ctx = f.dataset.hotelform, text = $("#hotelIn").value.trim(); if (!text) return;
+  const ctx = f.dataset.hotelform, typed = $("#hotelIn").value.trim(); if (!typed) return;
+  const text = extractUrl(typed) || typed;
   const folder = ctx.startsWith("f:") ? state.folders.find(x => "f:" + x.id === ctx) : null;
   const city = folder ? listCity(folder.places) : (state.res?.city || "");
   const btn = f.querySelector("[type=submit]"); btn.disabled = true; btn.textContent = "מחפש…";
@@ -1643,10 +1681,11 @@ document.addEventListener("submit", async e => {
   render();
 });
 document.addEventListener("click", e => {
-  const t = e.target.closest("[data-ftab],[data-hoteledit],[data-hotelcancel],[data-hoteldel],[data-routefocus],[data-routemode],[data-showmap],[data-mymaps],[data-catf],[data-ocr],[data-tab],[data-save],[data-remove],[data-del],[data-folder],[data-pick],[data-days],[data-share],.place,#addAll,[data-video],[data-delvideo],#showAll,#backFolders,#delFolderAsk,#delFolderYes,#delFolderNo,#sheetClose,#sheet");
+  const t = e.target.closest("[data-hoteltrip],[data-ftab],[data-hoteledit],[data-hotelcancel],[data-hoteldel],[data-routefocus],[data-routemode],[data-showmap],[data-mymaps],[data-catf],[data-ocr],[data-tab],[data-save],[data-remove],[data-del],[data-folder],[data-pick],[data-days],[data-share],.place,#addAll,[data-video],[data-delvideo],#showAll,#backFolders,#delFolderAsk,#delFolderYes,#delFolderNo,#sheetClose,#sheet");
   if (!t) return;
-  if (t.id === "sheet") { if (e.target === t) { state.pick = null; renderSheet(); } return; }
-  if (t.id === "sheetClose") { state.pick = null; renderSheet(); return; }
+  if (t.id === "sheet") { if (e.target === t) { state.pick = null; state.hotelPick = null; renderSheet(); } return; }
+  if (t.id === "sheetClose") { state.pick = null; state.hotelPick = null; renderSheet(); return; }
+  if (t.matches("[data-hoteltrip]")) { addHotelTo(t.dataset.hoteltrip, t.dataset.city || ""); return; }
   if (t.matches("[data-pick]")) { addToFolder(t.dataset.pick); return; }
   if (t.matches("[data-tab]")) { state.tab = t.dataset.tab; state.sel = null; if (state.tab !== "folders") state.folder = null; render(); return; }
   if (t.matches("[data-catf]")) { state.catFilter = t.dataset.catf || null; state.sel = null; render(); return; }
