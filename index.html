@@ -338,7 +338,7 @@ body.busy .status::after,body.busy #geoNote::after{animation:bob 1s ease-in-out 
 <body>
 <main class="app">
   <header class="brand"><div class="logo"><svg class="pal" viewBox="0 0 64 80" aria-hidden="true"><path d="M32 4C18 4 7 15 7 29c0 19 25 45 25 45s25-26 25-45C57 15 46 4 32 4z" fill="var(--pin)"/><ellipse cx="18.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><ellipse cx="45.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><circle cx="24" cy="28" r="3.4" fill="var(--face)"/><circle cx="40" cy="28" r="3.4" fill="var(--face)"/><circle cx="25.3" cy="26.8" r="1.1" fill="#fff"/><circle cx="41.3" cy="26.8" r="1.1" fill="#fff"/><path d="M26.5 36.5q5.5 4.6 11 0" stroke="var(--face)" stroke-width="2.6" fill="none" stroke-linecap="round"/></svg><h1 dir="ltr">FeedTrip</h1></div>
-    <div class="hdr"><span class="count" id="ver">v1.14</span><button class="addbtn" id="addBtn" type="button" aria-expanded="false" aria-controls="addBox" aria-label="הוספת קישור לסרטון"><span aria-hidden="true">+</span></button></div></header>
+    <div class="hdr"><span class="count" id="ver">v1.15</span><button class="addbtn" id="addBtn" type="button" aria-expanded="false" aria-controls="addBox" aria-label="הוספת קישור לסרטון"><span aria-hidden="true">+</span></button></div></header>
 
 
   <div class="addbox" id="addBox" hidden>
@@ -934,6 +934,8 @@ function loadTess(){
   });
 }
 async function ocrWorker(){ const T = await loadTess(); return workerP ||= T.createWorker(["heb", "eng"]); }
+// Frames for reading: the video is scanned quickly at low resolution, and a frame is kept each time the bright
+// text on screen changes (a new caption appears), instead of at fixed times that can miss a caption.
 async function videoFrames(blob){
   const url = URL.createObjectURL(blob);
   const vid = document.createElement("video");
@@ -941,27 +943,83 @@ async function videoFrames(blob){
   try {
     await new Promise((res, rej) => { vid.onloadeddata = res; vid.onerror = rej; setTimeout(rej, 20000); });
     const dur = vid.duration || 0;
-    const n = Math.min(30, Math.max(4, Math.floor(dur / 2.5)));
-    const W = Math.min(720, vid.videoWidth || 720), H = Math.round((vid.videoHeight || 1280) * W / (vid.videoWidth || 720));
+    const vw = vid.videoWidth || 720, vh = vid.videoHeight || 1280;
+    const seek = t => new Promise(res => { vid.onseeked = res; vid.currentTime = t; setTimeout(res, 4000); });
+    // 1) quick scan: a small map of "bright, colourless" pixels (white caption text) every ~0.7 s
+    const sw = 120, sh = Math.max(40, Math.round(sw * vh / vw));
+    const sc = document.createElement("canvas"); sc.width = sw; sc.height = sh;
+    const sx = sc.getContext("2d", { willReadFrequently: true });
+    const step = Math.max(0.7, dur / 60), times = [];
+    let prev = null, lastT = -99;
+    for (let t = Math.min(0.4, dur / 2); t < dur; t += step) {
+      await seek(t);
+      sx.drawImage(vid, 0, 0, sw, sh);
+      const d = sx.getImageData(0, 0, sw, sh).data, mask = new Uint8Array(sw * sh);
+      for (let k = 0; k < mask.length; k++) { const r = d[k*4], g = d[k*4+1], b = d[k*4+2]; mask[k] = (Math.min(r, g, b) > 185 && Math.max(r, g, b) - Math.min(r, g, b) < 45) ? 1 : 0; }
+      let diff = 0; if (prev) for (let k = 0; k < mask.length; k++) diff += mask[k] !== prev[k];
+      if (!prev || diff / mask.length > 0.004 || t - lastT > 3) { times.push(t); lastT = t; }
+      prev = mask;
+    }
+    // at most 24 frames, spread over the video
+    const pick = times.length <= 24 ? times : Array.from({ length: 24 }, (_, i) => times[Math.round(i * (times.length - 1) / 23)]);
+    // 2) the kept frames at reading resolution
+    const W = Math.min(1080, Math.max(720, vw)), H = Math.round(vh * W / vw);
     const c = document.createElement("canvas"); c.width = W; c.height = H;
     const ctx = c.getContext("2d");
     const frames = [];
-    for (let i = 1; i <= n; i++) {
-      vid.currentTime = dur * i / (n + 1);
-      await new Promise(res => { vid.onseeked = res; setTimeout(res, 4000); });
-      ctx.drawImage(vid, 0, 0, W, H);
-      frames.push(c.toDataURL("image/jpeg", 0.85));
-    }
+    for (const t of pick) { await seek(t); ctx.drawImage(vid, 0, 0, W, H); frames.push(c.toDataURL("image/jpeg", 0.9)); }
     return frames;
   } finally { URL.revokeObjectURL(url); }
 }
+// Two clean versions of a picture for the reader: caption text isolated (bright, colourless pixels → black on
+// white), and a high-contrast grey version for dark text on light boxes.
+async function ocrVariants(src){
+  const img = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = src; });
+  const scale = Math.min(2, Math.max(1, 1080 / (img.naturalWidth || 1080)));
+  const W = Math.round(img.naturalWidth * scale), H = Math.round(img.naturalHeight * scale);
+  const c = document.createElement("canvas"); c.width = W; c.height = H;
+  const x = c.getContext("2d", { willReadFrequently: true });
+  x.drawImage(img, 0, 0, W, H);
+  const id = x.getImageData(0, 0, W, H), d = id.data;
+  const grey = new Uint8ClampedArray(d.length), iso = new Uint8ClampedArray(d.length);
+  let lo = 255, hi = 0, bright = 0;
+  for (let k = 0; k < d.length; k += 4) { const y = 0.299*d[k] + 0.587*d[k+1] + 0.114*d[k+2]; if (y < lo) lo = y; if (y > hi) hi = y; }
+  const span = Math.max(1, hi - lo);
+  for (let k = 0; k < d.length; k += 4) {
+    const r = d[k], g = d[k+1], b = d[k+2], y = 0.299*r + 0.587*g + 0.114*b;
+    const v = Math.max(0, Math.min(255, (y - lo) * 255 / span));
+    grey[k] = grey[k+1] = grey[k+2] = v; grey[k+3] = 255;
+    const text = Math.min(r, g, b) > 195 && Math.max(r, g, b) - Math.min(r, g, b) < 45;
+    iso[k] = iso[k+1] = iso[k+2] = text ? 0 : 255; iso[k+3] = 255; if (text) bright++;
+  }
+  const out = [];
+  for (const px of [iso, grey]) { x.putImageData(new ImageData(px, W, H), 0, 0); out.push(c.toDataURL("image/png")); }
+  return out;
+}
+// Lines the reader is fairly sure about; low-confidence words (texture read as letters) are dropped.
+function goodLines(data){
+  const lines = (data.lines && data.lines.length) ? data.lines : String(data.text || "").split("\n").map(t => ({ text: t, confidence: 70, words: null }));
+  return lines.map(l => (l.words ? l.words.filter(w => w.confidence >= 45).map(w => w.text).join(" ") : l.text).trim())
+    .filter((t, i) => t && (lines[i].confidence ?? 70) >= 40);
+}
 async function ocrImages(images, onProgress){
   const w = await ocrWorker();
+  const mode = async m => { try { await w.setParameters({ tessedit_pageseg_mode: m }); } catch {} };
   const lines = new Set();
+  const add = arr => {
+    arr.forEach(l => lines.add(l));
+    // a name split over two caption lines ("bamboo house" / "in Sidemen") is tried joined as well
+    for (let i = 0; i + 1 < arr.length; i++) if (arr[i].split(" ").length <= 3 && arr[i+1].split(" ").length <= 3) lines.add(arr[i] + " " + arr[i+1]);
+  };
   for (let i = 0; i < images.length; i++) {
     onProgress?.(i, images.length);
-    const { data } = await w.recognize(images[i]);
-    String(data.text || "").split("\n").forEach(l => { l = l.trim(); if (l) lines.add(l); });
+    let variants; try { variants = await ocrVariants(images[i]); } catch { variants = [images[i]]; }
+    // tested on reel-style captions: the isolated version read in automatic layout finds white text, outlined
+    // text and white stickers; the grey version, read as one block, is the fallback when it finds almost nothing
+    await mode("3");
+    const first = goodLines((await w.recognize(variants[0])).data);
+    add(first);
+    if (variants[1] && first.join("").replace(/[^\p{L}]/gu, "").length < 6) { await mode("6"); add(goodLines((await w.recognize(variants[1])).data)); }
   }
   return [...lines];
 }
@@ -972,7 +1030,7 @@ function ocrCandidates(lines){
   for (const raw of lines) for (let part of raw.split(/[|•·,;:📍]|\s[-–—]\s/u)) {
     // a Latin line with a stray Hebrew letter or two is OCR noise around the text: keep the Latin part
     if (/[A-Za-zÀ-ÿ]{3}/.test(part) && !/[֐-׿]{3}/.test(part)) part = part.replace(/[֐-׿]+/g, " ");
-    part = part.replace(/^\s*(?:stay|visit|go|try|eat|sleep|drink)?\s*(?:in|at|to|on|near|from|the|a|an)?\s*(?:a|an|the)?\s+(?=[A-Za-zÀ-ÿ])/i, "");
+    part = part.replace(/^\s*(?:stay|sta[vy]|slay|slav|visit|go|try|eat|sleep|drink)?\s*(?:in|at|to|on|near|from|the|a|an)?\s*(?:a|an|the)?\s+(?=[A-Za-zÀ-ÿ])/i, "");
     part = part.replace(/^[\d\s.)\-–#@]+/, "").replace(/[^\p{L}\p{N}'’&.\- ]/gu, " ").replace(/\s+/g, " ").trim();
     if (part.length < 3 || part.length > 40 || part.split(" ").length > 5) continue;
     if ((part.match(/\p{L}/gu) || []).length / part.length < 0.7) continue;
