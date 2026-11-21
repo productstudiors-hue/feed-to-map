@@ -356,6 +356,17 @@ body.busy .hello,body.busy #status,body.busy #geoNote{display:none!important}
 .dots i:nth-child(2){animation-delay:.15s}.dots i:nth-child(3){animation-delay:.3s}
 @keyframes dot{0%,80%,100%{transform:scale(.6);opacity:.4}40%{transform:scale(1);opacity:1}}
 /* ---- route: what it is about ---- */
+/* ---- route from a chat ---- */
+.chatadd{display:flex;align-items:center;gap:12px;width:100%;margin:12px 0 0;padding:12px 14px;border-radius:20px;border:1.5px dashed var(--line);background:transparent;text-align:right;color:var(--ink);font:inherit}
+.chatadd>span:not(.plus){flex:1;min-width:0;display:flex;flex-direction:column}
+.chatadd .plus{flex:0 0 30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--ink);color:var(--paper);font-size:20px}
+.chat-pal{width:40px;height:40px;flex:0 0 auto}
+.chatbox{margin:12px 0 0;background:var(--surface);border-radius:22px;padding:16px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:10px}
+.chathead{display:flex;gap:12px;align-items:flex-start}.chathead p{margin:2px 0 0}
+.chatbox textarea{width:100%;box-sizing:border-box;font:inherit;font-size:14.5px;border:0;background:var(--soft);border-radius:14px;padding:12px;color:var(--ink);resize:vertical}
+.chatactions{margin:0 0 8px}
+.src{flex:0 0 auto;font-size:11.5px;border-radius:99px;padding:2px 8px;background:var(--soft);color:var(--muted);white-space:nowrap}
+.src.vid{background:var(--sel);color:var(--ink)}
 .focus{display:flex;gap:8px;margin:12px 0 0;overflow-x:auto;scrollbar-width:none}
 .focus button{flex:1 0 auto;display:inline-flex;align-items:center;justify-content:center;gap:6px;border:0;border-radius:14px;padding:10px 12px;background:var(--surface);box-shadow:0 2px 8px rgba(59,54,84,.06);font-weight:500}
 .focus button .ci{width:17px;height:17px;stroke-width:2;color:inherit}
@@ -391,7 +402,7 @@ body.busy .hello,body.busy #status,body.busy #geoNote{display:none!important}
 <body>
 <main class="app">
   <header class="brand"><div class="logo"><svg class="pal" viewBox="0 0 64 80" aria-hidden="true"><path d="M32 4C18 4 7 15 7 29c0 19 25 45 25 45s25-26 25-45C57 15 46 4 32 4z" fill="var(--pin)"/><ellipse cx="18.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><ellipse cx="45.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><circle cx="24" cy="28" r="3.4" fill="var(--face)"/><circle cx="40" cy="28" r="3.4" fill="var(--face)"/><circle cx="25.3" cy="26.8" r="1.1" fill="#fff"/><circle cx="41.3" cy="26.8" r="1.1" fill="#fff"/><path d="M26.5 36.5q5.5 4.6 11 0" stroke="var(--face)" stroke-width="2.6" fill="none" stroke-linecap="round"/></svg><h1 dir="ltr">FeedTrip</h1></div>
-    <div class="hdr"><span class="count" id="ver">v1.26</span><button class="addbtn" id="addBtn" type="button" aria-expanded="false" aria-controls="addBox" aria-label="הוספת קישור לסרטון"><span aria-hidden="true">+</span></button></div></header>
+    <div class="hdr"><span class="count" id="ver">v1.27</span><button class="addbtn" id="addBtn" type="button" aria-expanded="false" aria-controls="addBox" aria-label="הוספת קישור לסרטון"><span aria-hidden="true">+</span></button></div></header>
 
 
   <div class="addbox" id="addBox" hidden>
@@ -497,6 +508,7 @@ const extractUrl = s => (String(s||"").match(/https?:\/\/[^\s"'<>]+/) || [""])[0
 
 async function scan(raw){
   const url = extractUrl(raw);
+  if (!url && looksLikeChatRoute(raw)) { setAddBox(false); $("#url").value = ""; state.pick = null; state.chatPick = String(raw); renderSheet(); return; }
   if (!url) { setStatus("לא מצאתי קישור. הדבק קישור שמתחיל ב־https://", true); return; }
   $("#url").value = url;
   $("#go").disabled = true; $("#bar").hidden = false; document.body.classList.add("busy"); $("#setup").innerHTML = "";
@@ -535,7 +547,7 @@ async function scan(raw){
 }
 $("#form").addEventListener("submit", e => { e.preventDefault(); scan($("#url").value); });
 $("#pinForm").addEventListener("submit", e => { e.preventDefault(); store.set("ftm_pin", $("#pin").value.trim()); $("#pinForm").hidden = true; $("#pin").value = ""; if (state.pendingUrl) scan(state.pendingUrl); });
-$("#paste").onclick = async () => { try { const t = await navigator.clipboard.readText(); $("#url").value = extractUrl(t) || t; if (extractUrl(t)) scan(t); } catch { $("#url").focus(); setStatus("הדבק את הקישור בשדה (לחיצה ארוכה ← הדבק)."); } };
+$("#paste").onclick = async () => { try { const t = await navigator.clipboard.readText(); $("#url").value = extractUrl(t) || t; if (extractUrl(t) || looksLikeChatRoute(t)) scan(t); } catch { $("#url").focus(); setStatus("הדבק את הקישור בשדה (לחיצה ארוכה ← הדבק)."); } };
 
 /* ---- saved places live in folders, one per country by default ---- */
 function loadFolders(){
@@ -558,7 +570,7 @@ function loadFeed(){
 }
 const vidKey = v => (v.source?.url || v.title || "").replace(/\?.*$/, "");
 const saveFeed = () => store.set("ftm_feed", state.feed);
-let state = { feed: [], res: null, tab: "list", sel: null, folders: loadFolders(), folder: null, days: {}, pick: null };
+let state = { feed: [], res: null, tab: "list", sel: null, folders: loadFolders(), folder: null, days: {}, pick: null, routeSrc: {}, chatEdit: null, chatPick: null };
 state.feed = loadFeed(); state.res = state.feed[0] || null;
 const saveFolders = () => store.set("ftm_folders", state.folders);
 
@@ -584,7 +596,7 @@ function addToFolder(id){
   let added = 0;
   state.pick.forEach(p => { if (!f.places.some(t => key(t) === key(p))) { f.places.push(p); added++; } });
   saveFolders();
-  state.pick = null; renderSheet();
+  state.pick = null; state.chatPick = null; renderSheet();
   setStatus(added ? `שמרתי ${added} מקומות בתיקייה "${f.name}". הם נשארים גם בפיד.` : `המקומות כבר נמצאים בתיקייה "${f.name}".`);
   render();
 }
@@ -601,7 +613,29 @@ function removeVideo(v){
   saveFeed();
   state.res = state.feed[0] || null; state.sel = null; delete state.days.v;
 }
+function applyChatText(ctx, text){
+  const days = parseChatRoute(text);
+  if (!days.length) { setStatus("לא מצאתי בטקסט ימים ועצירות. כל עצירה צריכה להיות בשורה נפרדת, ואפשר לפתוח כל יום ב\"יום 1:\".", true); return; }
+  saveChatPlan(ctx, { text, days, at: Date.now() }); state.chatEdit = null; state.routeSrc[ctx] = "chat";
+  setStatus(`קיבלתי ${days.length} ימים ו־${days.reduce((a, d) => a + d.stops.length, 0)} עצירות מהצ'ט. מאתר אותם על המפה ומשלב את המקומות מהסרטונים.`);
+  render();
+}
+// Text from a chat was shared or pasted: ask which trip it is for.
+function renderChatSheet(){
+  const el = $("#sheet");
+  const trips = state.folders.filter(f => f.places.length).map(f => ({ ctx: "f:" + f.id, label: `${flagOf(f.name)} ${f.name}`, sub: `${f.places.length} מקומות` }));
+  if (state.res) trips.push({ ctx: "v", label: cleanTitle(state.res.title), sub: "הסרטון הפתוח" });
+  const days = parseChatRoute(state.chatPick);
+  el.hidden = false;
+  el.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="chatT"><span class="grab" aria-hidden="true"></span>
+    <h3 id="chatT">לאיזה טיול להוסיף את המסלול מהצ'ט?</h3>
+    <p class="sub" style="margin:0">💬 ${days.length} ימים, ${days.reduce((a, d) => a + d.stops.length, 0)} עצירות. המקומות מהסרטונים ישולבו בו.</p>
+    ${trips.length ? `<ul class="folders">${trips.map(t => `<li><button class="fbtn" data-chattrip="${esc(t.ctx)}"><span><b>${esc(t.label)}</b> <span class="sub">${esc(t.sub)}</span></span><span aria-hidden="true">‹</span></button></li>`).join("")}</ul>`
+      : `<p>עוד אין טיול לחבר אליו את המסלול. שתפו קודם סרטון מהיעד.</p>`}
+    <button class="small" id="sheetClose" type="button" style="align-self:flex-start">ביטול</button></div>`;
+}
 function renderSheet(){
+  if (state.chatPick) return renderChatSheet();
   const el = $("#sheet");
   if (!state.pick) { el.hidden = true; el.innerHTML = ""; return; }
   const sug = suggestFolder(state.res);
@@ -849,7 +883,119 @@ function exportMyMaps(){
 
 // walking time and distance between two stops; a long hop suggests transit
 const legText = l => `${l.km > 2.5 ? "🚇" : "🚶"} ${l.min >= 60 ? Math.floor(l.min / 60) + " ש׳ " + (l.min % 60 ? (l.min % 60) + " דק׳" : "") : l.min + " דק׳"} · ${l.km < 1 ? Math.round(l.km * 100) * 10 + " מ׳" : l.km.toFixed(1) + " ק״מ"}${l.km > 2.5 ? " · כדאי בתחבורה" : ""}${l.fromHotel ? " מהמלון" : ""}`;
+/* ---- a route from a chat (ChatGPT, Claude, Gemini…): pasted text → days and stops, mixed with the videos' places ---- */
+const HE_ORD = { "ראשון":1,"שני":2,"שלישי":3,"רביעי":4,"חמישי":5,"שישי":6,"שביעי":7,"שמיני":8,"תשיעי":9,"עשירי":10 };
+const EN_ORD = { one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,first:1,second:2,third:3,fourth:4,fifth:5 };
+const SLOT_WORDS = /^(?:בוקר|לפני הצהריים|צהריים|אחר הצהריים|אחה"צ|אחה״צ|ערב|לילה|ארוחת בוקר|ארוחת צהריים|ארוחת ערב|קפה|morning|late morning|midday|noon|afternoon|evening|night|breakfast|brunch|lunch|dinner|coffee|drinks|sunset)\s*[:\-–—]\s*/i;
+const DAY_RE = /^(?:day|יום)\s*(\d{1,2}|[a-z]+|[א-ת]+)(?=[\s:.\-–—)|,]|$)\s*[:.\-–—)|,]?\s*(.*)$/i;
+const NOT_STOP = /^(?:טיפ|טיפים|הערה|הערות|שימו לב|לינה|תחבורה|תקציב|סיכום|מומלץ|tips?|notes?|budget|transport|getting around|accommodation|summary|overview|why|optional)\b/i;
+function cleanChatLine(l){
+  return l.replace(/\*\*|__|`/g, "").replace(/^#+\s*/, "").replace(/^[\s>*•·▪◦‣⁃–—-]+/, "").replace(/^\d{1,2}[.)]\s+/, "").replace(/[\u{1F300}-\u{1FAFF}☀-➿️]/gu, "").trim();
+}
+function parseChatRoute(text){
+  const days = []; let cur = null;
+  const lines = String(text || "").replace(/\r/g, "").split("\n");
+  for (const raw of lines) {
+    let l = cleanChatLine(raw); if (!l) continue;
+    const dm = l.match(DAY_RE);
+    if (dm) { const k = dm[1].toLowerCase(), n = /^\d+$/.test(k) ? +k : (HE_ORD[k] || EN_ORD[k]);
+      if (n) { cur = { day: n, title: dm[2].replace(/^[:\-–—\s]+/, "").slice(0, 60), stops: [] }; days.push(cur); continue; } }
+    if (NOT_STOP.test(l) || /:$/.test(l)) continue;
+    let time = "";
+    const tm = l.match(/^(\d{1,2})[:.](\d{2})\s*(am|pm)?(?:\s*[-–—]\s*\d{1,2}[:.]\d{2}\s*(?:am|pm)?)?\s*[:\-–—|]?\s*/i);
+    if (tm) { const h = +tm[1] % 12 + (/pm/i.test(tm[3] || "") ? 12 : /am/i.test(tm[3] || "") ? 0 : (+tm[1] === 12 ? 12 : 0)); time = `${String(tm[3] ? h : +tm[1]).padStart(2, "0")}:${tm[2]}`; l = l.slice(tm[0].length); }
+    const sm = l.match(SLOT_WORDS); if (sm) { time ||= sm[0].replace(/\s*[:\-–—]\s*$/, ""); l = l.slice(sm[0].length); }
+    const meal = l.match(/^(breakfast|brunch|lunch|dinner|coffee|drinks|ארוחת (?:בוקר|צהריים|ערב))\s+(?:at\s+|ב[-־]?)/i); if (meal) time ||= meal[1];
+    l = l.replace(/^(?:breakfast|brunch|lunch|dinner|coffee|drinks|visit|explore|walk (?:to|through|around)|head to|stop at|go to|see|tour)\s+(?:at|to|the)?\s*/i, "")
+      .replace(/^(?:ארוחת (?:בוקר|צהריים|ערב)|קפה|ביקור|סיור|הליכה|נסיעה|עצירה|כניסה)\s+(?:ב|אל|ל)?[-־]?\s*/, "");
+    // "Name – what to do there", "Name: note", "Name (local name)"
+    let [name, ...rest] = l.split(/\s+[–—-]\s+|:\s+|\s+\|\s+/);
+    let note = rest.join(" · ");
+    const par = name.match(/^(.*?)\s*\(([^)]+)\)\s*(.*)$/);
+    if (par) { const latin = /[a-z]/i.test(par[2]) && /[֐-׿]/.test(par[1]); name = latin ? par[2] : par[1]; note = [par[3], note].filter(Boolean).join(" "); }
+    name = name.replace(/[.,;!]+$/, "").trim();
+    // a sentence is a note on the previous stop, not a place
+    if (name.length < 3 || name.length > 55 || name.split(/\s+/).length > 7) { if (cur?.stops.length && l.length < 200) { const s = cur.stops.at(-1); s.note = [s.note, l].filter(Boolean).join(" · ").slice(0, 160); } continue; }
+    if (!cur) { cur = { day: 1, title: "", stops: [], intro: true }; days.push(cur); }
+    cur.stops.push({ name, slot: time, note: note.slice(0, 160) });
+  }
+  if (days.length > 1 && days[0].title === "" && days[0].intro) days.shift();
+  return days.filter(d => d.stops.length).map((d, i) => ({ ...d, day: i + 1, stops: d.stops.slice(0, 12).map((s, j) => ({ ...s, id: `c${i}_${j}`, from: "chat" })) }));
+}
+const looksLikeChatRoute = t => !extractUrl(t) && parseChatRoute(t).reduce((a, d) => a + d.stops.length, 0) >= 3 && /(?:^|\n)\s*[#*\s]*(?:day|יום)\s*\S+/i.test(t);
+const chatPlans = () => store.get("ftm_chatplans", {});
+const chatPlan = ctx => chatPlans()[routeKey(ctx)] || null;
+function saveChatPlan(ctx, plan){ const all = chatPlans(); if (plan) all[routeKey(ctx)] = plan; else delete all[routeKey(ctx)]; store.set("ftm_chatplans", all); }
+// the request to paste in the chat: the places from the videos, and a format this app reads back
+function chatPrompt(places, city, nDays){
+  const where = HE_CITY[city] || city || "היעד";
+  const names = places.filter(p => catOf(p) !== "stay").map(p => p.name).slice(0, 40);
+  return `תבנה לי מסלול טיול ב${where} ל־${nDays} ימים.${names.length ? `\nאלה מקומות ששמרתי מסרטונים ואני רוצה לשלב (תוסיף מקומות נוספים שמתאימים, ותשבץ כל מקום ביום של האזור שלו):\n${names.map(n => "- " + n).join("\n")}` : ""}
+\nכתוב כל יום בשורה "יום 1: כותרת", ומתחתיו כל עצירה בשורה נפרדת בפורמט:
+09:00 - שם המקום (באנגלית או בשפה המקומית, כמו במפות) - משפט קצר על מה עושים שם`;
+}
+// Chat stops that are also in the videos become that same place; video places that nobody planned join the
+// closest day (if it is a short walk away), the rest wait under "more from the videos".
+function mergeChat(ctx, places, city){
+  const plan = chatPlan(ctx); if (!plan) return null;
+  const used = new Set();
+  const days = plan.days.map(d => ({ ...d, stops: d.stops.map(s => {
+    const want = toks(s.name);
+    const v = want.length && places.find(p => !used.has(p) && sameName(want, new Set(toks(p.name))) || !used.has(p) && toks(p.name).length && sameName(toks(p.name), new Set(want)));
+    if (v) { used.add(v); return { p: v, slot: s.slot, note: s.note, both: true }; }
+    return { p: s, slot: s.slot, note: s.note };
+  }) }));
+  const extra = [];
+  for (const p of places) {
+    if (used.has(p) || catOf(p) === "stay") continue;
+    if (!(p.lat && p.lng)) { extra.push(p); continue; }
+    let best = null;
+    days.forEach(d => d.stops.forEach((s, i) => { if (s.p.lat && s.p.lng) { const k = km(s.p, p); if (!best || k < best.k) best = { d, i, k }; } }));
+    if (best && best.k <= 2) best.d.stops.splice(best.i + 1, 0, { p, slot: "", note: "", added: true, near: best.k });
+    else extra.push(p);
+  }
+  days.forEach(d => { let prev = null; d.km = 0; d.stops.forEach(s => { if (prev && s.p.lat && prev.lat) { const k = km(prev, s.p) * 1.3; s.leg = { km: k, min: Math.max(1, Math.round(k / 4.5 * 60)) }; d.km += k; } if (s.p.lat) prev = s.p; }); d.transit = d.km > 6; d.name = d.title; });
+  return { days, extra, rest: [], hotel: null, byArea: true, pending: plan.days.flatMap(d => d.stops).filter(s => !s.lat && !s.geoTried).length };
+}
+function locateChat(ctx, city){
+  const plan = chatPlan(ctx); if (!plan || !city) return;
+  const stops = plan.days.flatMap(d => d.stops);
+  if (!stops.some(s => !s.lat && !s.geoTried)) return;
+  locatePlaces(stops, city, () => { const now = chatPlan(ctx); if (now && now.text === plan.text) { saveChatPlan(ctx, plan); render(); } });
+}
+function chatBoxHTML(ctx, places, city){
+  const plan = chatPlan(ctx);
+  if (state.chatEdit === ctx) {
+    const prompt = chatPrompt(places, city, Math.max(1, defaultDays(places)));
+    return `<div class="chatbox"><div class="chathead">${pinny("happy", "chat-pal")}<div><b>מסלול מצ'ט</b><p class="sub">1. שלחו לצ'ט את הבקשה, עם המקומות מהסרטונים. 2. העתיקו את התשובה והדביקו כאן.</p></div></div>
+      <div class="row"><a class="btn small" target="_blank" rel="noopener" href="https://chatgpt.com/?q=${encodeURIComponent(prompt)}">פתיחה ב-ChatGPT</a><a class="btn small" target="_blank" rel="noopener" href="https://claude.ai/new?q=${encodeURIComponent(prompt)}">פתיחה ב-Claude</a><button class="small" type="button" data-chatcopy="${esc(encodeURIComponent(prompt))}">העתקת הבקשה</button></div>
+      <textarea id="chatIn" rows="8" placeholder="הדביקו כאן את המסלול מהצ'ט. למשל:&#10;יום 1: העיר העתיקה&#10;09:00 - Colosseum - כרטיס מראש&#10;13:00 - Roscioli - צהריים">${esc(plan?.text || "")}</textarea>
+      <div class="row"><button class="primary-link" type="button" data-chatsave="${ctx}">בניית המסלול</button><button class="small ghost" type="button" data-chatcancel>ביטול</button></div></div>`;
+  }
+  if (!plan) return `<button class="chatadd" data-chatedit="${ctx}">${pinny("wink", "chat-pal")}<span><b>יש לכם מסלול מצ'ט?</b><span class="sub">בנו מסלול ב-ChatGPT או ב-Claude עם המקומות מהסרטונים, והדביקו אותו כאן</span></span><span class="plus">+</span></button>`;
+  const src = state.routeSrc[ctx] || "chat";
+  return `<div class="seg" role="group" aria-label="מקור המסלול"><button data-routesrc="${ctx}|chat" aria-pressed="${src === "chat"}">💬 מצ'ט + סרטונים</button><button data-routesrc="${ctx}|auto" aria-pressed="${src !== "chat"}">🎬 רק מהסרטונים</button></div>`;
+}
+function chatRouteHTML(ctx, places, city, title){
+  const m = mergeChat(ctx, places, city);
+  const fromVid = m.days.reduce((a, d) => a + d.stops.filter(s => s.both || s.added).length, 0);
+  const share = shareText("route", title, places, city, m);
+  return `<p class="bestnote">${pinny("happy", "best-pal")}<span><b>${m.days.length} ימים מהצ'ט</b>${fromVid ? `, ועוד ${fromVid} מקומות מהסרטונים שובצו בהם` : ""}.${m.pending ? ` מאתר על המפה עוד ${m.pending} עצירות…` : ""}</span></p>
+    <div class="row chatactions"><button class="small" data-chatedit="${ctx}">עריכת הטקסט</button><button class="small ghost" data-chatdel="${ctx}">הסרת המסלול מהצ'ט</button></div>
+    ${shareRow(share)}
+    ${m.days.map(d => `<div class="day"><div class="dayhead"><span class="daynum"><small>יום</small>${esc(d.day)}</span><span class="daytitle"><b>${esc(d.title || "יום " + d.day)}</b><span class="sub">${[d.stops.length + " עצירות", d.km ? `${d.km < 1 ? "פחות מק״מ" : d.km.toFixed(1) + " ק״מ"} ${d.transit ? "· כדאי בתחבורה" : "ברגל"}` : ""].filter(Boolean).join(" · ")}</span></span>
+      <a class="btn small primary-link" target="_blank" rel="noopener" href="${openRoute(d.stops.map(s => s.p), city, d.transit)}">ניווט</a></div>
+      <ol class="stops">${d.stops.map(s => `${s.leg ? `<li class="leg" aria-label="מרחק"><span>${legText(s.leg)}</span></li>` : ""}<li><span class="dot cat-${catOf(s.p)}">${catIcon(catOf(s.p))}</span><span class="stop"><b>${esc(s.p.name)}</b><span class="sub">${[s.slot, s.note].filter(Boolean).map(esc).join(" · ")}</span></span><span class="src ${s.both || s.added ? "vid" : "chat"}">${s.both ? "🎬 גם בסרטון" : s.added ? "🎬 מהסרטון, קרוב" : "💬"}</span></li>`).join("")}</ol></div>`).join("")}
+    ${m.extra.length ? `<div class="day rest"><h3>🎬 עוד מהסרטונים</h3><p class="sub" style="margin:0">לא נמצאים ליד אף יום במסלול מהצ'ט. אפשר לבקש מהצ'ט לשלב אותם.</p>
+      <ol class="stops">${m.extra.map(p => `<li><span class="dot cat-${catOf(p)}">${catIcon(catOf(p))}</span><span class="stop"><b>${esc(p.name)}</b>${areaOf(p) ? `<span class="sub">${esc(areaOf(p))}</span>` : ""}</span></li>`).join("")}</ol></div>` : ""}
+    <p class="sub">הימים, הסדר והשעות מהצ'ט. מקום מהסרטון שנמצא עד 2 ק״מ מעצירה במסלול נכנס אחריה באותו יום.</p>`;
+}
 function routeHTML(ctx, places, itinerary, city, title){
+  const chat = chatBoxHTML(ctx, places, city);
+  if (chatPlan(ctx) && (state.routeSrc[ctx] || "chat") === "chat" && state.chatEdit !== ctx) { locateChat(ctx, city); return chat + chatRouteHTML(ctx, places, city, title); }
+  return chat + routeAutoHTML(ctx, places, itinerary, city, title);
+}
+function routeAutoHTML(ctx, places, itinerary, city, title){
   if (!places.length) return emptyHTML("oops", "אין עדיין מקומות למסלול", "");
   // first time on a longer list: Pinny asks which kind of route to build
   if (places.length >= 6 && !routeMode(ctx)) {
@@ -1559,10 +1705,19 @@ function renderTabs(r){
 }
 
 document.addEventListener("click", e => {
-  const t = e.target.closest("[data-ftab],[data-routefocus],[data-routemode],[data-showmap],[data-mymaps],[data-catf],[data-ocr],[data-tab],[data-save],[data-remove],[data-del],[data-folder],[data-pick],[data-days],[data-share],.place,#addAll,[data-video],[data-delvideo],#showAll,#backFolders,#delFolderAsk,#delFolderYes,#delFolderNo,#sheetClose,#sheet");
+  const t = e.target.closest("[data-chatedit],[data-chatsave],[data-chatcancel],[data-chatdel],[data-chatcopy],[data-routesrc],[data-chattrip],[data-ftab],[data-routefocus],[data-routemode],[data-showmap],[data-mymaps],[data-catf],[data-ocr],[data-tab],[data-save],[data-remove],[data-del],[data-folder],[data-pick],[data-days],[data-share],.place,#addAll,[data-video],[data-delvideo],#showAll,#backFolders,#delFolderAsk,#delFolderYes,#delFolderNo,#sheetClose,#sheet");
   if (!t) return;
-  if (t.id === "sheet") { if (e.target === t) { state.pick = null; renderSheet(); } return; }
-  if (t.id === "sheetClose") { state.pick = null; renderSheet(); return; }
+  if (t.id === "sheet") { if (e.target === t) { state.pick = null; state.chatPick = null; renderSheet(); } return; }
+  if (t.id === "sheetClose") { state.pick = null; state.chatPick = null; renderSheet(); return; }
+  if (t.matches("[data-chatedit]")) { state.chatEdit = t.dataset.chatedit; render(); setTimeout(() => $("#chatIn")?.focus(), 30); return; }
+  if (t.matches("[data-chatcancel]")) { state.chatEdit = null; render(); return; }
+  if (t.matches("[data-chatcopy]")) { const txt = decodeURIComponent(t.dataset.chatcopy); (navigator.clipboard?.writeText(txt) || Promise.reject()).then(() => setStatus("הבקשה הועתקה. הדביקו אותה בצ'ט, ואת התשובה הדביקו כאן."), () => setStatus("לא הצלחתי להעתיק. אפשר ללחוץ על \"פתיחה ב-ChatGPT\".", true)); return; }
+  if (t.matches("[data-chatsave]")) { applyChatText(t.dataset.chatsave, $("#chatIn").value); return; }
+  if (t.matches("[data-chatdel]")) { saveChatPlan(t.dataset.chatdel, null); delete state.routeSrc[t.dataset.chatdel]; setStatus("המסלול מהצ'ט הוסר. המסלול מהסרטונים נשאר."); render(); return; }
+  if (t.matches("[data-routesrc]")) { const [ctx, v] = t.dataset.routesrc.split("|"); state.routeSrc[ctx] = v; render(); return; }
+  if (t.matches("[data-chattrip]")) { const txt = state.chatPick; state.chatPick = null; renderSheet(); const ctx = t.dataset.chattrip;
+    if (ctx.startsWith("f:")) { state.tab = "folders"; state.folder = ctx.slice(2); state.folderTab = "route"; } else { state.tab = "route"; state.folder = null; }
+    applyChatText(ctx, txt); return; }
   if (t.matches("[data-pick]")) { addToFolder(t.dataset.pick); return; }
   if (t.matches("[data-tab]")) { state.tab = t.dataset.tab; state.sel = null; if (state.tab !== "folders") state.folder = null; render(); return; }
   if (t.matches("[data-catf]")) { state.catFilter = t.dataset.catf || null; state.sel = null; render(); return; }
@@ -1612,7 +1767,7 @@ $("#resetAsk").onclick = () => { $("#resetConfirm").hidden = false; $("#resetAsk
 $("#resetNo").onclick = () => { $("#resetConfirm").hidden = true; $("#resetAsk").hidden = false; };
 $("#resetYes").onclick = () => {
   try { Object.keys(localStorage).filter(k => k.startsWith("ftm_")).forEach(k => localStorage.removeItem(k)); } catch {}
-  state = { feed: [], res: null, tab: "list", sel: null, folders: [], folder: null, days: {}, pick: null };
+  state = { feed: [], res: null, tab: "list", sel: null, folders: [], folder: null, days: {}, pick: null, routeSrc: {}, chatEdit: null, chatPick: null };
   $("#url").value = ""; $("#gmap").removeAttribute("src"); delete $("#gmap").dataset.src;
   $("#resetConfirm").hidden = true; $("#resetAsk").hidden = false;
   setStatus("ניקיתי הכל. מתחילים מחדש!");
@@ -1642,7 +1797,7 @@ const shared = qs.get("url") || qs.get("text") || qs.get("title");
 fixCities();
 render();
 locateCurrent();
-if (extractUrl(shared)) { history.replaceState(null, "", location.pathname); scan(shared); }
+if (extractUrl(shared) || (shared && looksLikeChatRoute(shared))) { history.replaceState(null, "", location.pathname); scan(shared); }
 </script>
 </body>
 </html>
