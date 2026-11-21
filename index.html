@@ -331,6 +331,12 @@ body.busy .status::after,body.busy #geoNote::after{animation:bob 1s ease-in-out 
 .corner .num,.corner .mapbtn{position:static;box-shadow:0 2px 8px rgba(0,0,0,.2)}
 .corner .num{min-width:28px;height:28px;font-size:13px}
 .place.wide.sel .bigimg{box-shadow:0 0 0 2.5px var(--surface),0 0 0 5px var(--pin)}
+/* ---- folders tab: tabs first, then the folder ---- */
+body.infolders #card,body.infolders #panel{order:2}
+body.infolders #tabs{order:1}
+body.infolders #resetBox{order:3}
+.ftabs{margin:12px 0 4px}
+.ftabs .n{color:var(--muted);font-size:12px}
 /* ---- scanning: Pinny reads the video ---- */
 .scancard{display:none;flex-direction:column;align-items:center;text-align:center;gap:12px;padding:30px 12px 18px}
 body.busy .scancard{display:flex}
@@ -392,7 +398,7 @@ body.busy .hello,body.busy #status,body.busy #geoNote{display:none!important}
 <body>
 <main class="app">
   <header class="brand"><div class="logo"><svg class="pal" viewBox="0 0 64 80" aria-hidden="true"><path d="M32 4C18 4 7 15 7 29c0 19 25 45 25 45s25-26 25-45C57 15 46 4 32 4z" fill="var(--pin)"/><ellipse cx="18.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><ellipse cx="45.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><circle cx="24" cy="28" r="3.4" fill="var(--face)"/><circle cx="40" cy="28" r="3.4" fill="var(--face)"/><circle cx="25.3" cy="26.8" r="1.1" fill="#fff"/><circle cx="41.3" cy="26.8" r="1.1" fill="#fff"/><path d="M26.5 36.5q5.5 4.6 11 0" stroke="var(--face)" stroke-width="2.6" fill="none" stroke-linecap="round"/></svg><h1 dir="ltr">FeedTrip</h1></div>
-    <div class="hdr"><span class="count" id="ver">v1.21</span><button class="addbtn" id="addBtn" type="button" aria-expanded="false" aria-controls="addBox" aria-label="הוספת קישור לסרטון"><span aria-hidden="true">+</span></button></div></header>
+    <div class="hdr"><span class="count" id="ver">v1.22</span><button class="addbtn" id="addBtn" type="button" aria-expanded="false" aria-controls="addBox" aria-label="הוספת קישור לסרטון"><span aria-hidden="true">+</span></button></div></header>
 
 
   <div class="addbox" id="addBox" hidden>
@@ -545,6 +551,8 @@ function loadFolders(){
     f = old.length ? [{ id: "f" + Date.now(), name: "הטיול שלי", places: old }] : [];
     store.set("ftm_folders", f);
   }
+  // older saves kept the video's address in "source", which also marks Google data: move it to "video"
+  f.forEach(x => x.places.forEach(p => { if (/^https?:/.test(p.source || "")) { p.video ||= p.source; delete p.source; } }));
   return f;
 }
 // The feed keeps every scanned video until the user deletes it.
@@ -562,11 +570,15 @@ const saveFolders = () => store.set("ftm_folders", state.folders);
 
 const COUNTRY_HE = { Japan:"יפן", "Czech Republic":"צ׳כיה", Czechia:"צ׳כיה", Portugal:"פורטוגל", Italy:"איטליה", France:"צרפת", Spain:"ספרד", Greece:"יוון", Thailand:"תאילנד", "United Kingdom":"אנגליה", UK:"אנגליה", England:"אנגליה", Germany:"גרמניה", Netherlands:"הולנד", Hungary:"הונגריה", Austria:"אוסטריה", "United States":"ארה״ב", USA:"ארה״ב", Israel:"ישראל", "United Arab Emirates":"איחוד האמירויות", UAE:"איחוד האמירויות", Turkey:"טורקיה", Türkiye:"טורקיה", "South Korea":"קוריאה", Georgia:"גאורגיה", Cyprus:"קפריסין", Poland:"פולין", Romania:"רומניה", Croatia:"קרואטיה", Montenegro:"מונטנגרו", Vietnam:"וייטנאם", India:"הודו", Mexico:"מקסיקו" };
 const CITY_COUNTRY = { Tokyo:"יפן", Kyoto:"יפן", Osaka:"יפן", Prague:"צ׳כיה", Lisbon:"פורטוגל", Porto:"פורטוגל", Paris:"צרפת", Rome:"איטליה", Milan:"איטליה", Florence:"איטליה", Naples:"איטליה", London:"אנגליה", Berlin:"גרמניה", Amsterdam:"הולנד", Barcelona:"ספרד", Madrid:"ספרד", Athens:"יוון", Bangkok:"תאילנד", Dubai:"איחוד האמירויות", Budapest:"הונגריה", "New York":"ארה״ב", "Tel Aviv":"ישראל", Jerusalem:"ישראל", Vienna:"אוסטריה", Seoul:"קוריאה", Istanbul:"טורקיה" };
-const suggestFolder = r => COUNTRY_HE[r?.country] || CITY_COUNTRY[r?.city] || r?.country || r?.city || "";
+Object.assign(CITY_COUNTRY, { Florence:"איטליה", Naples:"איטליה", Tuscany:"איטליה", Amalfi:"איטליה", Sicily:"איטליה", Sardinia:"איטליה", Athens:"יוון", Santorini:"יוון", Crete:"יוון",
+  Phuket:"תאילנד", Madeira:"פורטוגל", Tbilisi:"גאורגיה", Bali:"באלי", Cyprus:"קפריסין", Eilat:"ישראל", Haifa:"ישראל", Safed:"ישראל", "Rosh Pina":"ישראל", "Mitzpe Ramon":"ישראל",
+  Acre:"ישראל", Nazareth:"ישראל", Jaffa:"ישראל", "Sea of Galilee":"ישראל", "Upper Galilee":"ישראל", "Golan Heights":"ישראל", "Dead Sea":"ישראל" });
+// the folder name to suggest: the country in Hebrew; a place the app doesn't know keeps its Hebrew name if it has one
+const suggestFolder = r => COUNTRY_HE[r?.country] || CITY_COUNTRY[r?.city] || HE_CITY[r?.city] || r?.country || r?.city || "";
 
 const key = p => (p.name + "|" + (p.city || "")).toLowerCase();
 const folderOf = p => state.folders.find(f => f.places.some(t => key(t) === key(p)));
-const withCity = p => ({ ...p, city: p.city || state.res?.city || "", source: p.source || state.res?.source?.url || "" });
+const withCity = p => ({ ...p, city: p.city || state.res?.city || "", video: p.video || state.res?.source?.url || "" });
 
 function openPicker(places){
   state.pick = places.map(withCity);
@@ -1113,13 +1125,16 @@ async function googleEnrich(places, city){
     todo.forEach(p => p.gTried = true);
   } catch {} finally { googlingNow.delete(places); }
 }
+// What the app learns later about a place (location, photo, rating, details) also reaches its saved copies.
 function copyToFolders(v){
   state.folders.forEach(f => f.places.forEach(fp => {
     const src = v.places.find(p => key(withCity(p)) === key(fp));
     if (!src) return;
-    if (src.lat && !fp.lat) Object.assign(fp, { lat: src.lat, lng: src.lng, area: src.area, address: src.address });
-    if (src.img && (!fp.img || (src.imgBy && !fp.imgBy))) Object.assign(fp, { img: src.img, imgSrc: src.imgSrc, imgBy: src.imgBy });
+    if (src.lat && !fp.lat) Object.assign(fp, { lat: src.lat, lng: src.lng, area: src.area, address: src.address, osm: src.osm });
+    const better = src.img && (!fp.img || (src.imgFrom !== fp.imgFrom && src.source === "google") || (fp.imgNear && !src.imgNear));
+    if (better) Object.assign(fp, { img: src.img, imgSrc: src.imgSrc, imgBy: src.imgBy, imgFrom: src.imgFrom, imgNear: src.imgNear });
     if (src.rating && !fp.rating) Object.assign(fp, { rating: src.rating, ratingCount: src.ratingCount, mapsUrl: src.mapsUrl });
+    for (const k of ["wiki", "why", "dish", "local", "gtype", "from"]) if (src[k] && !fp[k]) fp[k] = src[k];
   }));
 }
 /* ---- deep scan: the server watches the video (speech + text on screen) with Gemini ---- */
@@ -1540,6 +1555,7 @@ function renderFeedBar(){
 
 function render(){
   document.body.classList.toggle("has-feed", state.feed.length > 0);
+  document.body.classList.toggle("infolders", state.tab === "folders");
   renderFeedBar();
   const r = state.res;
   const onFolders = state.tab === "folders";
@@ -1557,7 +1573,7 @@ function render(){
     $("#card").hidden = true;
     $("#panel").innerHTML = state.folders.length
       ? `<ul class="folder-grid">${state.folders.map(f => { const cities = [...new Set(f.places.map(p => HE_CITY[p.city] || p.city).filter(Boolean))].slice(0, 3).join(" · ");
-          return `<li><button class="fcard" data-folder="${f.id}">${folderTiles(f)}<span class="fname"><span class="flag" aria-hidden="true">${flagOf(f.name)}</span>${esc(f.name)}</span><span class="sub">${f.places.length} מקומות${cities ? " · " + esc(cities) : ""}</span></button></li>`; }).join("")}</ul>`
+          return `<li><button class="fcard" data-folder="${f.id}">${folderTiles(f)}<span class="fname"><span class="flag" aria-hidden="true">${flagOf(f.name)}</span>${esc(f.name)}</span><span class="sub">${f.places.length} מקומות${cities ? " · " + esc(cities) : ""}</span>${(() => { const n = new Set(f.places.map(p => p.video).filter(Boolean)).size; return n > 1 ? `<span class="sub">מ־${n} סרטונים</span>` : ""; })()}</button></li>`; }).join("")}</ul>`
       : emptyHTML("sleepy", "עוד אין תיקיות", "ברשימה של כל סרטון לוחצים \"+ שמור\", ואני אציע תיקייה לפי המדינה.");
     return;
   }
@@ -1575,7 +1591,7 @@ function render(){
   $("#card").classList.toggle("nomap", !!folder && !places.length);
   $("#title").textContent = folder ? folder.name : cleanTitle(r.title);
   $("#meta").innerHTML = folder
-    ? `<button class="small" id="backFolders" type="button">› כל התיקיות</button><span>${places.length} מקומות</span><button class="small" id="delFolderAsk" type="button">מחק תיקייה</button>`
+    ? `<button class="small" id="backFolders" type="button">› כל התיקיות</button><span>${flagOf(folder.name)} ${places.length} מקומות${(() => { const n = new Set(places.map(p => p.video).filter(Boolean)).size; return n > 1 ? ` מ־${n} סרטונים` : ""; })()}</span><button class="small ghost" id="delFolderAsk" type="button">מחק תיקייה</button>`
     : `${r.city ? `<span class="chip place-chip">${flagOf(CITY_COUNTRY[r.city] || COUNTRY_HE[r.country] || r.city)} ${esc(HE_CITY[r.city] || r.city)}</span>` : ""}${r.source?.author ? `<span class="author">${esc(cleanTitle(r.source.author).slice(0, 40))}</span>` : ""}${r.source?.url ? `<a class="chip src-chip" href="${esc(r.source.url)}" target="_blank" rel="noopener">${r.source.platform === "instagram" ? "לפוסט" : "לסרטון"} ↗</a>` : ""}${r.ocrFailed && !r.ocrDone ? `<button class="small" data-ocr type="button">📷 נסה שוב לקרוא את הטקסט שעל המסך</button>` : ""}${r.summary?`<p class="vsum">${pinny("wink", "vsum-pal")}<span><b>מה נאמר בסרטון</b>${esc(r.summary)}</span></p>`:""}`;
 
   const sel = state.sel != null ? places[state.sel] : null;
@@ -1588,8 +1604,11 @@ function render(){
 
   let html = "";
   if (folder) {
+    const ft = state.folderTab || "list";
     html = `<div id="delFolderConfirm" class="setup" hidden style="margin-bottom:12px"><p style="margin:0 0 8px"><b>למחוק את התיקייה "${esc(folder.name)}" עם כל ${places.length} המקומות שבה?</b></p><div class="row"><button class="small danger" id="delFolderYes" type="button">מחק תיקייה</button><button class="small" id="delFolderNo" type="button">ביטול</button></div></div>` + (places.length
-      ? `<h3 class="sec">מסלול</h3>${routeHTML("f:" + folder.id, places, null, city, folder.name)}<h3 class="sec">המקומות בתיקייה</h3>${catbar}${shareRow(shareText("list", folder.name, shown.map(([p]) => p), city))}<ul class="list">${shown.map(([p,i])=>placeHTML(p,i,p.city,true)).join("")}</ul>`
+      ? `<div class="seg ftabs" role="tablist"><button data-ftab="list" aria-pressed="${ft === "list"}">המקומות <span class="n">${places.length}</span></button><button data-ftab="route" aria-pressed="${ft === "route"}">מסלול</button></div>`
+        + (ft === "route" ? routeHTML("f:" + folder.id, places, null, city, folder.name)
+          : `${catbar}${shareRow(shareText("list", folder.name, shown.map(([p]) => p), city))}<ul class="list">${shown.map(([p,i])=>placeHTML(p,i,p.city,true)).join("")}</ul>`)
       : emptyHTML("sleepy", "התיקייה ריקה", "אפשר להוסיף לה מקומות מכל סרטון בפיד."));
   } else if (state.tab === "list") {
     const savedN = places.filter(p => folderOf(withCity(p))).length;
@@ -1624,14 +1643,15 @@ document.addEventListener("submit", async e => {
   render();
 });
 document.addEventListener("click", e => {
-  const t = e.target.closest("[data-hoteledit],[data-hotelcancel],[data-hoteldel],[data-routefocus],[data-routemode],[data-showmap],[data-mymaps],[data-catf],[data-ocr],[data-tab],[data-save],[data-remove],[data-del],[data-folder],[data-pick],[data-days],[data-share],.place,#addAll,[data-video],[data-delvideo],#showAll,#backFolders,#delFolderAsk,#delFolderYes,#delFolderNo,#sheetClose,#sheet");
+  const t = e.target.closest("[data-ftab],[data-hoteledit],[data-hotelcancel],[data-hoteldel],[data-routefocus],[data-routemode],[data-showmap],[data-mymaps],[data-catf],[data-ocr],[data-tab],[data-save],[data-remove],[data-del],[data-folder],[data-pick],[data-days],[data-share],.place,#addAll,[data-video],[data-delvideo],#showAll,#backFolders,#delFolderAsk,#delFolderYes,#delFolderNo,#sheetClose,#sheet");
   if (!t) return;
   if (t.id === "sheet") { if (e.target === t) { state.pick = null; renderSheet(); } return; }
   if (t.id === "sheetClose") { state.pick = null; renderSheet(); return; }
   if (t.matches("[data-pick]")) { addToFolder(t.dataset.pick); return; }
   if (t.matches("[data-tab]")) { state.tab = t.dataset.tab; state.sel = null; if (state.tab !== "folders") state.folder = null; render(); return; }
   if (t.matches("[data-catf]")) { state.catFilter = t.dataset.catf || null; state.sel = null; render(); return; }
-  if (t.matches("[data-folder]")) { state.folder = t.dataset.folder; state.sel = null; state.catFilter = null; render(); locateCurrent(); return; }
+  if (t.matches("[data-ftab]")) { state.folderTab = t.dataset.ftab; state.sel = null; render(); return; }
+  if (t.matches("[data-folder]")) { state.folder = t.dataset.folder; state.folderTab = "list"; state.sel = null; state.catFilter = null; render(); locateCurrent(); return; }
   if (t.id === "backFolders") { state.folder = null; state.sel = null; render(); return; }
   if (t.id === "showAll") { state.sel = null; render(); return; }
   if (t.id === "addAll") { openPicker(state.res.places); return; }
