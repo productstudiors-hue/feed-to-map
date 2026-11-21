@@ -177,7 +177,7 @@ button:disabled{opacity:.55;cursor:default}
 </head>
 <body>
 <main class="app">
-  <header class="brand"><h1 dir="ltr">FeedTrip</h1><span class="count" id="ver">v1.6.2</span></header>
+  <header class="brand"><h1 dir="ltr">FeedTrip</h1><span class="count" id="ver">v1.7</span></header>
 
   <h2 class="hero">ראית מקום בטיקטוק?<span>שים אותו על המפה.</span></h2>
   <p class="hero-sub">מדביקים קישור מטיקטוק או אינסטגרם, ומקבלים את כל המקומות מהסרטון על מפה, מסודרים לפי אזורים.</p>
@@ -459,7 +459,29 @@ function shareText(kind, title, places, city, plan){
 }
 const waLink = text => `https://wa.me/?text=${encodeURIComponent(text)}`;
 function shareRow(text){
-  return `<div class="row share"><a class="btn small wa" href="${waLink(text)}" target="_blank" rel="noopener">שתף בוואטסאפ</a>${navigator.share ? `<button class="small" type="button" data-share="${esc(encodeURIComponent(text))}">שתף…</button>` : ""}</div>`;
+  return `<div class="row share"><a class="btn small wa" href="${waLink(text)}" target="_blank" rel="noopener">שתף בוואטסאפ</a>${navigator.share ? `<button class="small" type="button" data-share="${esc(encodeURIComponent(text))}">שתף…</button>` : ""}<button class="small" type="button" data-mymaps>ייצוא ל-Google My Maps</button></div>`;
+}
+// A CSV that Google My Maps imports as a layer: every place lands on your own Google map,
+// which opens in the Maps app on the trip. Known places go by coordinates, the rest by "name, city".
+function exportMyMaps(){
+  const folder = state.tab === "folders" ? state.folders.find(f => f.id === state.folder) : null;
+  const all = folder ? folder.places : (state.res?.places || []);
+  const places = all.filter(p => !state.catFilter || catOf(p) === state.catFilter);
+  if (!places.length) return;
+  const name = folder ? folder.name : cleanTitle(state.res.title);
+  const q = v => `"${String(v ?? "").replace(/"/g, '""').replace(/\s+/g, " ").trim()}"`;
+  const rows = [["שם", "מיקום", "קטגוריה", "מה נאמר", "עיר"]].concat(places.map(p => {
+    const city = p.city || state.res?.city || "";
+    const where = p.lat ? `${(+p.lat).toFixed(6)}, ${(+p.lng).toFixed(6)}` : [p.name, HE_CITY[city] ? city : city].filter(Boolean).join(", ");
+    return [p.name, where, CATS[catOf(p)].label, p.why || "", HE_CITY[city] || city];
+  }));
+  const csv = "\ufeff" + rows.map(r => r.map(q).join(",")).join("\r\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  a.download = `FeedTrip - ${name.replace(/[\\/:*?"<>|]/g, " ").slice(0, 60)}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  setStatus(`הקובץ ירד (${places.length} מקומות). ב-Google My Maps: מפה חדשה ← ייבוא ← בוחרים את הקובץ ← "מיקום" כמיקום ו"שם" ככותרת.`);
 }
 
 function routeHTML(ctx, places, itinerary, city, title){
@@ -1011,7 +1033,7 @@ function renderTabs(r){
 }
 
 document.addEventListener("click", e => {
-  const t = e.target.closest("[data-catf],[data-ocr],[data-tab],[data-save],[data-remove],[data-del],[data-folder],[data-pick],[data-days],[data-share],.place,#addAll,[data-video],[data-delvideo],#showAll,#backFolders,#delFolderAsk,#delFolderYes,#delFolderNo,#sheetClose,#sheet");
+  const t = e.target.closest("[data-mymaps],[data-catf],[data-ocr],[data-tab],[data-save],[data-remove],[data-del],[data-folder],[data-pick],[data-days],[data-share],.place,#addAll,[data-video],[data-delvideo],#showAll,#backFolders,#delFolderAsk,#delFolderYes,#delFolderNo,#sheetClose,#sheet");
   if (!t) return;
   if (t.id === "sheet") { if (e.target === t) { state.pick = null; renderSheet(); } return; }
   if (t.id === "sheetClose") { state.pick = null; renderSheet(); return; }
@@ -1031,6 +1053,7 @@ document.addEventListener("click", e => {
   if (t.id === "delFolderYes") { const f = state.folders.find(x => x.id === state.folder); state.folders = state.folders.filter(x => x !== f); saveFolders(); state.folder = null; state.sel = null; setStatus(`התיקייה "${f.name}" נמחקה.`); render(); return; }
   if (t.matches("[data-remove]")) { const f = state.folders.find(x => x.id === state.folder); f.places.splice(+t.dataset.remove, 1); saveFolders(); state.sel = null; render(); return; }
   if (t.matches("[data-ocr]")) { if (state.res) { delete state.res.ocrFailed; ocrVideo(state.res); } return; }
+  if (t.matches("[data-mymaps]")) { exportMyMaps(); return; }
   if (t.matches("[data-share]")) { navigator.share({ text: decodeURIComponent(t.dataset.share) }).catch(() => {}); return; }
   if (t.matches("[data-days]")) {
     const [ctx, step] = t.dataset.days.split("|");
