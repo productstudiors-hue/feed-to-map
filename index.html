@@ -177,7 +177,7 @@ button:disabled{opacity:.55;cursor:default}
 </head>
 <body>
 <main class="app">
-  <header class="brand"><h1 dir="ltr">FeedTrip</h1><span class="count" id="ver">v1.7</span></header>
+  <header class="brand"><h1 dir="ltr">FeedTrip</h1><span class="count" id="ver">v1.7.1</span></header>
 
   <h2 class="hero">ראית מקום בטיקטוק?<span>שים אותו על המפה.</span></h2>
   <p class="hero-sub">מדביקים קישור מטיקטוק או אינסטגרם, ומקבלים את כל המקומות מהסרטון על מפה, מסודרים לפי אזורים.</p>
@@ -514,7 +514,11 @@ async function photon(q, center, limit = 5){
   }
   return null;
 }
-const geoRadius = city => (HE_CITY[city] || ["Tel Aviv", "Jerusalem"].includes(city)) ? 30 : 120;
+// Israel: the map data there is in Hebrew, so Hebrew place names can be looked up directly.
+const IL_TOWNS = { "Tel Aviv":"תל אביב", "Jerusalem":"ירושלים", "Eilat":"אילת", "Haifa":"חיפה", "Safed":"צפת", "Rosh Pina":"ראש פינה", "Mitzpe Ramon":"מצפה רמון", "Acre":"עכו", "Nazareth":"נצרת", "Jaffa":"יפו" };
+const IL_REGIONS = { "Sea of Galilee":"כנרת", "Upper Galilee":"הגליל העליון", "Golan Heights":"רמת הגולן", "Dead Sea":"ים המלח" };
+const inIsrael = city => !!(IL_TOWNS[city] || IL_REGIONS[city] || city === "Israel");
+const geoRadius = city => IL_REGIONS[city] ? 60 : (HE_CITY[city] || IL_TOWNS[city]) ? 30 : 120;
 async function cityCenter(city){
   const cache = store.get("ftm_cities", {});
   if (cache[city]) return cache[city];
@@ -525,7 +529,7 @@ async function cityCenter(city){
 }
 async function locateOne(p, city, center){
   const want = toks(p.name);
-  if (/[֐-׿]/.test(p.name) || !want.length) return "skip";
+  if ((/[֐-׿]/.test(p.name) && !inIsrael(city)) || !want.length) return "skip";
   const feats = await photon(`${p.name} ${city}`, center);
   if (feats === null) return "retry";
   const hit = feats.find(f => {
@@ -576,6 +580,7 @@ function goodPage(pg, center, km = 30){
   return !!center && kmBetween(center, [c.lon, c.lat]) < km;
 }
 const HE_CITY = { Tokyo:"טוקיו", Kyoto:"קיוטו", Osaka:"אוסקה", Lisbon:"ליסבון", Porto:"פורטו", Paris:"פריז", Rome:"רומא", Milan:"מילאנו", London:"לונדון", Berlin:"ברלין", Amsterdam:"אמסטרדם", Barcelona:"ברצלונה", Madrid:"מדריד", Athens:"אתונה", Bangkok:"בנגקוק", Dubai:"דובאי", Prague:"פראג", Budapest:"בודפשט", "New York":"ניו יורק", Vienna:"וינה", Seoul:"סיאול", Istanbul:"איסטנבול", Naples:"נאפולי", Florence:"פירנצה" };
+Object.assign(HE_CITY, IL_TOWNS, IL_REGIONS);
 async function findPhoto(p, city){
   const lang = /[֐-׿]/.test(p.name) ? "he" : "en";
   // Without the city's location a photo can't be checked (a "Jewish Quarter" in Jerusalem is not the one in Prague), so wait.
@@ -773,7 +778,7 @@ function ocrCandidates(lines){
   return [...out.values()].slice(0, 40);
 }
 const COUNTRIES_EN = "Indonesia|Italy|France|Spain|Portugal|Greece|Japan|Thailand|Vietnam|Czechia|Czech Republic|Germany|Austria|Hungary|Netherlands|United Kingdom|England|Croatia|Turkey|Mexico|Peru|USA|United States|Israel|Georgia|Cyprus|Montenegro|Albania|Switzerland|Morocco|Sri Lanka|India|Philippines|Malaysia|South Korea|China|Australia|Iceland|Norway";
-const REGIONS = { "באלי":"Bali", "טוסקנה":"Tuscany", "סנטוריני":"Santorini", "פוקט":"Phuket", "אמלפי":"Amalfi", "סרדיניה":"Sardinia", "סיציליה":"Sicily", "קפריסין":"Cyprus", "מדיירה":"Madeira", "כרתים":"Crete", "גאורגיה":"Georgia", "טביליסי":"Tbilisi" };
+const REGIONS = { "כנרת":"Sea of Galilee", "גליל העליון":"Upper Galilee", "גולן":"Golan Heights", "ים המלח":"Dead Sea", "באלי":"Bali", "טוסקנה":"Tuscany", "סנטוריני":"Santorini", "פוקט":"Phuket", "אמלפי":"Amalfi", "סרדיניה":"Sardinia", "סיציליה":"Sicily", "קפריסין":"Cyprus", "מדיירה":"Madeira", "כרתים":"Crete", "גאורגיה":"Georgia", "טביליסי":"Tbilisi" };
 // Whole words only ("פורטובלו" in London is not Porto); the first line counts most, then the city named most often.
 function cityFromText(text){
   text = String(text || "");
@@ -814,7 +819,7 @@ async function verifyCandidates(names, city, existing){
   const worker = async () => {
     while (queue.length) {
       const p = { name: queue.shift(), from: "screen", category: "מקום", city };
-      let r = /[֐-׿]/.test(p.name) ? "none" : await locateOne(p, city, center).catch(() => "none");
+      let r = /[֐-׿]/.test(p.name) && !inIsrael(city) ? "none" : await locateOne(p, city, center).catch(() => "none");
       if (r !== "ok" || !p.img) { const ph = await findPhoto(p, city).catch(() => "none"); if (r !== "ok") r = ph; }
       if (r === "ok" && p.lat && !found.some(f => dup(toks(f.name), toks(p.name)))) found.push(p);
     }
