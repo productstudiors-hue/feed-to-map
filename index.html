@@ -398,7 +398,7 @@ body.busy .hello,body.busy #status,body.busy #geoNote{display:none!important}
 <body>
 <main class="app">
   <header class="brand"><div class="logo"><svg class="pal" viewBox="0 0 64 80" aria-hidden="true"><path d="M32 4C18 4 7 15 7 29c0 19 25 45 25 45s25-26 25-45C57 15 46 4 32 4z" fill="var(--pin)"/><ellipse cx="18.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><ellipse cx="45.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><circle cx="24" cy="28" r="3.4" fill="var(--face)"/><circle cx="40" cy="28" r="3.4" fill="var(--face)"/><circle cx="25.3" cy="26.8" r="1.1" fill="#fff"/><circle cx="41.3" cy="26.8" r="1.1" fill="#fff"/><path d="M26.5 36.5q5.5 4.6 11 0" stroke="var(--face)" stroke-width="2.6" fill="none" stroke-linecap="round"/></svg><h1 dir="ltr">FeedTrip</h1></div>
-    <div class="hdr"><span class="count" id="ver">v1.23</span><button class="addbtn" id="addBtn" type="button" aria-expanded="false" aria-controls="addBox" aria-label="הוספת קישור לסרטון"><span aria-hidden="true">+</span></button></div></header>
+    <div class="hdr"><span class="count" id="ver">v1.24</span><button class="addbtn" id="addBtn" type="button" aria-expanded="false" aria-controls="addBox" aria-label="הוספת קישור לסרטון"><span aria-hidden="true">+</span></button></div></header>
 
 
   <div class="addbox" id="addBox" hidden>
@@ -510,7 +510,7 @@ function isHotelLink(link){
 async function scan(raw){
   const url = extractUrl(raw);
   if (!url) { setStatus("לא מצאתי קישור. הדבק קישור שמתחיל ב־https://", true); return; }
-  if (isHotelLink(url)) { setAddBox(false); $("#url").value = ""; openHotelSheet(url); return; }
+  if (isHotelLink(url)) { setAddBox(false); $("#url").value = ""; openHotelSheet(String(raw)); return; }
   $("#url").value = url;
   $("#go").disabled = true; $("#bar").hidden = false; document.body.classList.add("busy"); $("#setup").innerHTML = "";
   setStatus("רגע, אני קורא את הסרטון ומחפש את המקומות…");
@@ -621,12 +621,13 @@ function renderHotelSheet(){
   if (!state.hotelPick) { el.hidden = true; el.innerHTML = ""; return; }
   const trips = state.folders.filter(f => f.places.length).map(f => ({ ctx: "f:" + f.id, label: `${flagOf(f.name)} ${f.name}`, sub: `${f.places.length} מקומות`, city: listCity(f.places) }));
   if (state.res) trips.push({ ctx: "v", label: cleanTitle(state.res.title), sub: "הסרטון הפתוח", city: state.res.city || "" });
-  let host = ""; try { host = new URL(state.hotelPick).hostname.replace(/^www\./, ""); } catch {}
+  let host = ""; try { host = new URL(extractUrl(state.hotelPick)).hostname.replace(/^www\./, ""); } catch {}
+  const named = parseShareText(state.hotelPick).name;
   el.hidden = false;
   el.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="hotelT">
     <span class="grab" aria-hidden="true"></span>
     <h3 id="hotelT">לאיזה טיול להוסיף את המלון?</h3>
-    <p class="sub" style="margin:0">${catIcon("stay")} קישור מ־${esc(host)}. כל יום במסלול של הטיול יתחיל ויסתיים בו.</p>
+    <p class="sub" style="margin:0">${catIcon("stay")} ${named ? `<b>${esc(named)}</b> · ` : ""}מ־${esc(host)}. כל יום במסלול של הטיול יתחיל ויסתיים בו.</p>
     ${trips.length ? `<ul class="folders">${trips.map(t => `<li><button class="fbtn" data-hoteltrip="${esc(t.ctx)}" data-city="${esc(t.city)}"><span><b>${esc(t.label)}</b> <span class="sub">${esc(t.sub)}</span></span><span aria-hidden="true">‹</span></button></li>`).join("")}</ul>`
       : `<p>עוד אין טיול לחבר אליו את המלון. שתפו קודם סרטון מהיעד, ואז את המלון.</p>`}
     <button class="small" id="sheetClose" type="button" style="align-self:flex-start">ביטול</button>
@@ -637,8 +638,11 @@ async function addHotelTo(ctx, city){
   if (ctx.startsWith("f:")) { state.tab = "folders"; state.folder = ctx.slice(2); state.folderTab = "route"; } else { state.tab = "route"; state.folder = null; }
   render();
   setStatus("רגע, אני מחפש את המלון…");
-  const h = await hotelFromLink(link, city).catch(() => "retry");
-  if (!h || h === "retry") { setStatus(h === "retry" ? "אין חיבור כרגע. נסו שוב בעוד רגע." : "לא הצלחתי להבין איזה מלון זה מהקישור. אפשר לכתוב את שמו בכרטיס \"איפה אתם ישנים?\".", true); return; }
+  const h = await hotelFromShare(link, city).catch(() => "retry");
+  if (!h || h === "retry") {
+    // keep what was shared in the hotel box, so it only needs a small fix (a street name) instead of starting over
+    state.hotelEdit = ctx; state.hotelDraft = parseShareText(link).name || ""; render();
+    setStatus(h === "retry" ? "אין חיבור כרגע. נסו שוב בעוד רגע." : "לא מצאתי את המלון מהקישור לבד. כתבו את שמו (ואם אפשר גם את הרחוב) בשדה, ואמצא אותו.", true); return; }
   const all = routeHotels(); all[routeKey(ctx)] = h; store.set("ftm_hotels", all); delete state.days[ctx];
   setStatus(`מעולה, כל יום במסלול יתחיל ויסתיים ב־${h.name}.`);
   render();
@@ -854,6 +858,31 @@ function fromGoogleMaps(href){
   return { name: /^-?\d+\.\d+,/.test(dec(name)) ? "" : dec(name), lat: pin ? +pin[1] : null, lng: pin ? +pin[2] : null };
 }
 const cleanPageTitle = t => String(t || "").split(/\s[|–—-]\s|,\s*(?:updated|prices|booking)|\(|\s·\s/i)[0].replace(/^(?:google maps|booking\.com|airbnb)$/i, "").trim();
+// What apps put next to the link when sharing: Google Maps sends "name / address / link", Booking and Airbnb
+// send a sentence with the hotel's name. That text is often the most reliable way to find the hotel.
+function parseShareText(raw){
+  const lines = String(raw || "").replace(/https?:\/\/\S+/g, "\n").split(/\n+/).map(l => l
+    .replace(/^\s*(?:check out|have a look at|look at|i found|here'?s|take a look at|תראו את|הנה|מצאתי את)\s*(?:this|this place|this property|the)?\s*:?\s*/i, "")
+    .replace(/\s*(?:on|at|via|in|ב-?|ב־)\s*(?:booking\.com|booking|airbnb|google maps|expedia|agoda|tripadvisor|hotels\.com)\s*[!.:]*\s*$/i, "")
+    .replace(/^[\s"“”'!:.·|-]+|[\s"“”'!:.·|-]+$/g, "").trim()).filter(l => l.length > 2 && !/^(?:booking\.com|airbnb|google maps|shared from|נשלח)/i.test(l));
+  const name = lines[0] || "", address = lines.slice(1).find(l => /\d|,/.test(l)) || "";
+  return { name, address };
+}
+const JUNK_TITLE = /just a moment|access denied|attention required|are you a robot|captcha|^booking\.com|^airbnb|^google maps$|sign in|error/i;
+async function hotelFromShare(raw, city){
+  const link = extractUrl(raw), info = parseShareText(raw);
+  const g = link && fromGoogleMaps(link);
+  if (g && g.lat != null) return { name: g.name || info.name || "המלון", lat: g.lat, lng: g.lng, address: info.address, city, link };
+  // the name and address from the shared text first, the link as the fallback
+  if (info.name) {
+    for (const q of [info.address && `${info.name} ${info.address}`, info.address, info.name].filter(Boolean)) {
+      const h = await findHotel(q, city).catch(() => "retry");
+      if (h && h !== "retry") return { ...h, name: h.name && !/^\d/.test(h.name) ? h.name : info.name, link };
+      if (h === "retry") return "retry";
+    }
+  }
+  return link ? hotelFromLink(link, city) : null;
+}
 async function hotelFromLink(link, city){
   let g = fromGoogleMaps(link), title = "", final = link;
   if (!g) {
@@ -863,11 +892,13 @@ async function hotelFromLink(link, city){
     final = r.url || link;
     g = fromGoogleMaps(final);
     if (!g) {
-      title = cleanPageTitle(r.title);
+      title = JUNK_TITLE.test(r.title || "") ? "" : cleanPageTitle(r.title);
       // the page's own coordinates, when it has them (not Google's: those are where the server is)
       if (title && r.lat != null && r.lng != null) return { name: title, lat: r.lat, lng: r.lng, address: "", city, link };
       // otherwise the name from the address: booking.com/hotel/it/raphael.html → "raphael"
-      if (!title) title = decodeURIComponent((new URL(final).pathname.split("/").filter(Boolean).pop() || "").replace(/\.[a-z]+$/i, "").replace(/[-_+]/g, " ")).trim();
+      if (!title) { const slug = decodeURIComponent((new URL(final).pathname.split("/").filter(Boolean).pop() || "").replace(/\.[a-z-]+$/i, "").replace(/[-_+]/g, " ")).trim();
+        // a share code ("Share-AbC123") or an id is not a name
+        title = /^share\b|^\d+$/i.test(slug) || (/\d/.test(slug) && /[a-z]/i.test(slug) && !/\s/.test(slug)) ? "" : slug; }
     }
   }
   if (g) {
@@ -965,7 +996,7 @@ function routeHTML(ctx, places, itinerary, city, title){
   const mine = routeHotel(ctx), fromList = !mine && places.find(p => catOf(p) === "stay" && p.lat);
   const base = mine || fromList;
   const hotelBox = state.hotelEdit === ctx
-    ? `<form class="hotelform" data-hotelform="${ctx}">${catIcon("stay")}<input id="hotelIn" placeholder="שם, כתובת, או קישור/שיתוף מ-Booking או Google Maps" value="${esc(mine?.name || "")}" required><button class="primary-link" type="submit">שמירה</button><button class="small ghost" type="button" data-hotelcancel>ביטול</button></form>`
+    ? `<form class="hotelform" data-hotelform="${ctx}">${catIcon("stay")}<input id="hotelIn" placeholder="שם, כתובת, או קישור/שיתוף מ-Booking או Google Maps" value="${esc(state.hotelDraft || mine?.name || "")}" required><button class="primary-link" type="submit">שמירה</button><button class="small ghost" type="button" data-hotelcancel>ביטול</button></form>`
     : base ? `<div class="hotelrow cat-stay">${catIcon("stay")}<span><b>${esc(base.name)}</b><span class="sub">כל יום יוצא מכאן וחוזר לכאן${fromList ? " (מהרשימה)" : ""}</span></span><button class="small ghost" data-hoteledit="${ctx}">שינוי</button>${mine ? `<button class="small ghost" data-hoteldel="${ctx}">הסרה</button>` : ""}</div>`
     : `<button class="hoteladd" data-hoteledit="${ctx}">${catIcon("stay")}<span><b>איפה אתם ישנים?</b><span class="sub">הוסיפו את המלון, או שתפו אותו מ-Booking או מ-Google Maps ישר לאפליקציה</span></span><span class="plus">+</span></button>`;
   const plan = currentDays(ctx, places, itinerary);
@@ -1669,14 +1700,15 @@ document.addEventListener("submit", async e => {
   const f = e.target.closest("[data-hotelform]"); if (!f) return;
   e.preventDefault();
   const ctx = f.dataset.hotelform, typed = $("#hotelIn").value.trim(); if (!typed) return;
-  const text = extractUrl(typed) || typed;
+  const text = typed;
   const folder = ctx.startsWith("f:") ? state.folders.find(x => "f:" + x.id === ctx) : null;
   const city = folder ? listCity(folder.places) : (state.res?.city || "");
   const btn = f.querySelector("[type=submit]"); btn.disabled = true; btn.textContent = "מחפש…";
-  const h = await (/^https?:\/\//i.test(text) || /^(?:www\.|maps\.app\.goo\.gl|goo\.gl)/i.test(text) ? hotelFromLink(/^https?:/i.test(text) ? text : "https://" + text, city) : findHotel(text, city)).catch(() => "retry");
-  if (!h || h === "retry") { btn.disabled = false; btn.textContent = "שמירה"; setStatus(h === "retry" ? "אין חיבור למפה כרגע. נסו שוב בעוד רגע." : /^https?:|^www\./i.test(text) ? "לא הצלחתי להבין איזה מלון זה מהקישור. נסו קישור מ-Google Maps, או פשוט את שם המלון." : `לא מצאתי את "${text}"${city ? " ב־" + (HE_CITY[city] || city) : ""}. נסו להוסיף את שם הרחוב.`, true); return; }
+  const asLink = /^(?:www\.|maps\.app\.goo\.gl|goo\.gl)/i.test(text) ? "https://" + text : text;
+  const h = await (extractUrl(asLink) ? hotelFromShare(asLink, city) : findHotel(text, city)).catch(() => "retry");
+  if (!h || h === "retry") { btn.disabled = false; btn.textContent = "שמירה"; setStatus(h === "retry" ? "אין חיבור למפה כרגע. נסו שוב בעוד רגע." : extractUrl(asLink) ? "לא הצלחתי להבין איזה מלון זה מהקישור. כתבו את שם המלון (ואם אפשר גם את הרחוב)." : `לא מצאתי את "${text}"${city ? " ב־" + (HE_CITY[city] || city) : ""}. נסו להוסיף את שם הרחוב.`, true); return; }
   const all = routeHotels(); all[routeKey(ctx)] = h; store.set("ftm_hotels", all);
-  state.hotelEdit = null; delete state.days[ctx];
+  state.hotelEdit = null; state.hotelDraft = ""; delete state.days[ctx];
   setStatus(`מעולה, כל יום במסלול יתחיל ויסתיים ב־${h.name}.`);
   render();
 });
