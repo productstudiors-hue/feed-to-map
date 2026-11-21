@@ -317,7 +317,7 @@ body.busy .status::after,body.busy #geoNote::after{animation:bob 1s ease-in-out 
 <body>
 <main class="app">
   <header class="brand"><div class="logo"><svg class="pal" viewBox="0 0 64 80" aria-hidden="true"><path d="M32 4C18 4 7 15 7 29c0 19 25 45 25 45s25-26 25-45C57 15 46 4 32 4z" fill="var(--pin)"/><ellipse cx="18.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><ellipse cx="45.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><circle cx="24" cy="28" r="3.4" fill="var(--face)"/><circle cx="40" cy="28" r="3.4" fill="var(--face)"/><circle cx="25.3" cy="26.8" r="1.1" fill="#fff"/><circle cx="41.3" cy="26.8" r="1.1" fill="#fff"/><path d="M26.5 36.5q5.5 4.6 11 0" stroke="var(--face)" stroke-width="2.6" fill="none" stroke-linecap="round"/></svg><h1 dir="ltr">FeedTrip</h1></div>
-    <div class="hdr"><span class="count" id="ver">v1.11</span><button class="addbtn" id="addBtn" type="button" aria-expanded="false" aria-controls="addBox" aria-label="הוספת קישור לסרטון"><span aria-hidden="true">+</span></button></div></header>
+    <div class="hdr"><span class="count" id="ver">v1.12</span><button class="addbtn" id="addBtn" type="button" aria-expanded="false" aria-controls="addBox" aria-label="הוספת קישור לסרטון"><span aria-hidden="true">+</span></button></div></header>
 
 
   <div class="addbox" id="addBox" hidden>
@@ -762,6 +762,38 @@ async function findPhoto(p, city){
   if (!p.lat && pg.coordinates?.[0]) { p.lat = pg.coordinates[0].lat; p.lng = pg.coordinates[0].lon; }
   return "ok";
 }
+// Second chance for a real photo: free photos on Wikimedia Commons taken right where the place is (within ~150 m).
+// A photo whose title names the place is the place itself; otherwise it is labelled as a photo of the surroundings.
+const NOT_PHOTO = /\b(map|plan|logo|diagram|coat of arms|flag|svg|scheme|schema|karte|mappa|seal|icon|sign)\b/i;
+async function commonsNear(p){
+  const u = `https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=geosearch&ggscoord=${p.lat}|${p.lng}&ggsradius=150&ggslimit=20&ggsnamespace=6&prop=imageinfo|coordinates&iiprop=url|mime|extmetadata&iiurlwidth=480&iiextmetadatafilter=Artist`;
+  let pages;
+  try { const r = await fetch(u, { signal: AbortSignal.timeout(7000) }); if (!r.ok) return "retry"; pages = Object.values((await r.json()).query?.pages || {}); } catch { return "retry"; }
+  const want = toks(p.name);
+  const cands = pages.map(pg => {
+    const ii = pg.imageinfo?.[0]; if (!ii?.thumburl || !/jpe?g/i.test(ii.mime || "")) return null;
+    const title = pg.title.replace(/^File:/, "").replace(/\.[a-z]+$/i, "");
+    if (NOT_PHOTO.test(title)) return null;
+    const c = pg.coordinates?.[0];
+    const km = c ? kmBetween([p.lng, p.lat], [c.lon, c.lat]) : 0.15;
+    const named = want.length > 0 && sameName(want, new Set(toks(title)));
+    return { ii, title, km, named };
+  }).filter(Boolean).sort((a, b) => (b.named - a.named) || (a.km - b.km));
+  const best = cands[0];
+  if (!best) return "none";
+  p.img = best.ii.thumburl; p.imgSrc = best.ii.descriptionurl; p.imgFrom = "commons"; p.imgNear = !best.named;
+  const by = (best.ii.extmetadata?.Artist?.value || "").replace(/<[^>]+>/g, "").trim();
+  p.imgBy = by.length > 28 ? by.slice(0, 26) + "…" : by;
+  return "ok";
+}
+async function nearPhotos(places, onDone){
+  const todo = places.filter(p => !p.img && p.lat && !p.nearTried);
+  if (!todo.length) return;
+  const queue = [...todo];
+  const worker = async () => { while (queue.length) { const p = queue.shift(); const r = await commonsNear(p).catch(() => "retry"); if (r !== "retry") p.nearTried = true; if (r === "ok") onDone(); } };
+  await Promise.all([worker(), worker()]);
+  onDone();
+}
 async function photoPlaces(places, city, onDone){
   const todo = places.filter(p => !p.img && !p.imgTried);
   if (!todo.length || photographingNow.has(places)) return;
@@ -853,8 +885,8 @@ function locateCurrent(){
       const done = () => { saveFolders(); render(); };
       Promise.all(Object.entries(byCity).map(([c, ps]) => googleEnrich(ps, c))).then(() => {
         done();
-        Object.entries(byCity).forEach(([c, ps]) => locatePlaces(ps, c, done));
-        photoPlaces(f.places, "", done);
+        const photos = photoPlaces(f.places, "", done);
+        Promise.all([photos, ...Object.entries(byCity).map(([c, ps]) => locatePlaces(ps, c, done))]).then(() => nearPhotos(f.places, done));
       });
     }
   } else if (state.res) {
@@ -863,8 +895,7 @@ function locateCurrent(){
     // Watch the video (if Gemini is set), then Google (if its key is set); the free lookups fill only what is left.
     deepScan(v).then(async () => { done(); if (!v.deepTried) await ocrVideo(v); return googleEnrich(v.places, v.city); }).then(() => {
       done();
-      locatePlaces(v.places, v.city, done);
-      photoPlaces(v.places, v.city, done);
+      Promise.all([locatePlaces(v.places, v.city, done), photoPlaces(v.places, v.city, done)]).then(() => nearPhotos(v.places, done));
     });
   }
 }
@@ -961,7 +992,7 @@ function fixCities(){
     const c = cityFromText([v.title, v.source?.caption].filter(Boolean).join("\n"));
     if (!c || c === v.city) return;
     v.city = c; v.country = "";
-    v.places.forEach(p => { if (p.source === "google") return; ["lat","lng","area","address","osm","geoTried","img","imgSrc","imgBy","imgTried","wiki"].forEach(k => delete p[k]); p.city = c; });
+    v.places.forEach(p => { if (p.source === "google") return; ["lat","lng","area","address","osm","geoTried","img","imgSrc","imgBy","imgTried","wiki","imgFrom","imgNear","nearTried"].forEach(k => delete p[k]); p.city = c; });
   });
   if (changed) saveFeed();
 }
@@ -1135,7 +1166,7 @@ function folderTiles(f){
 function placeHTML(p, i, city, inFolder){
   const f = inFolder ? null : folderOf(withCity(p));
   const c = catOf(p);
-  const credit = p.img ? `<a class="credit" href="${esc(p.imgSrc)}" target="_blank" rel="noopener" data-stop>תמונה: ${p.imgBy ? "גוגל · " + esc(p.imgBy) : "ויקיפדיה"}</a>` : "";
+  const credit = p.img ? `<a class="credit" href="${esc(p.imgSrc)}" target="_blank" rel="noopener" data-stop>${p.imgFrom === "commons" ? `${p.imgNear ? "צילום מהסביבה" : "תמונה"} · ויקישיתוף${p.imgBy ? " · " + esc(p.imgBy) : ""}` : p.imgBy ? "תמונה: גוגל · " + esc(p.imgBy) : "תמונה: ויקיפדיה"}</a>` : "";
   const line = [`<span class="cat-inline cat-${c}">${catIcon(c)}${CATS[c].label}</span>`, inFolder && p.city ? esc(HE_CITY[p.city] || p.city) : "", areaOf(p) ? esc(areaOf(p)) : (p.neighborhood ? esc(p.neighborhood) : ""), p.price ? esc(p.price) : ""].filter(Boolean).join(" · ");
   return `<li class="place ${state.sel===i?"sel":""}" data-i="${i}">
     <div class="thumb cat-${c}">${p.img ? `<img src="${esc(p.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : catIcon(c, "big")}<span class="num">${i+1}</span></div>
