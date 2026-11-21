@@ -331,6 +331,13 @@ body.busy .status::after,body.busy #geoNote::after{animation:bob 1s ease-in-out 
 .corner .num,.corner .mapbtn{position:static;box-shadow:0 2px 8px rgba(0,0,0,.2)}
 .corner .num{min-width:28px;height:28px;font-size:13px}
 .place.wide.sel .bigimg{box-shadow:0 0 0 2.5px var(--surface),0 0 0 5px var(--pin)}
+/* ---- route: hotel ---- */
+.hotelrow,.hoteladd,.hotelform{display:flex;align-items:center;gap:10px;width:100%;margin:10px 0 0;padding:12px 14px;border-radius:18px;background:var(--surface);box-shadow:0 2px 8px rgba(59,54,84,.06);text-align:right;white-space:normal}
+.hotelrow>.ci,.hoteladd>.ci,.hotelform>.ci{flex:0 0 auto;width:22px;height:22px;color:var(--ci,#2A78A8)}
+.hotelrow>span,.hoteladd>span:not(.plus){flex:1;min-width:0;display:flex;flex-direction:column}
+.hoteladd{border:1.5px dashed var(--line);box-shadow:none;background:transparent}
+.hoteladd .plus{flex:0 0 30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--ink);color:var(--paper);font-size:20px}
+.hotelform input{flex:1;min-width:0;font:inherit;border:0;background:var(--soft);border-radius:12px;padding:10px 12px;color:var(--ink)}
 /* ---- route: what it is about ---- */
 .focus{display:flex;gap:8px;margin:12px 0 0;overflow-x:auto;scrollbar-width:none}
 .focus button{flex:1 0 auto;display:inline-flex;align-items:center;justify-content:center;gap:6px;border:0;border-radius:14px;padding:10px 12px;background:var(--surface);box-shadow:0 2px 8px rgba(59,54,84,.06);font-weight:500}
@@ -367,7 +374,7 @@ body.busy .status::after,body.busy #geoNote::after{animation:bob 1s ease-in-out 
 <body>
 <main class="app">
   <header class="brand"><div class="logo"><svg class="pal" viewBox="0 0 64 80" aria-hidden="true"><path d="M32 4C18 4 7 15 7 29c0 19 25 45 25 45s25-26 25-45C57 15 46 4 32 4z" fill="var(--pin)"/><ellipse cx="18.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><ellipse cx="45.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><circle cx="24" cy="28" r="3.4" fill="var(--face)"/><circle cx="40" cy="28" r="3.4" fill="var(--face)"/><circle cx="25.3" cy="26.8" r="1.1" fill="#fff"/><circle cx="41.3" cy="26.8" r="1.1" fill="#fff"/><path d="M26.5 36.5q5.5 4.6 11 0" stroke="var(--face)" stroke-width="2.6" fill="none" stroke-linecap="round"/></svg><h1 dir="ltr">FeedTrip</h1></div>
-    <div class="hdr"><span class="count" id="ver">v1.18</span><button class="addbtn" id="addBtn" type="button" aria-expanded="false" aria-controls="addBox" aria-label="הוספת קישור לסרטון"><span aria-hidden="true">+</span></button></div></header>
+    <div class="hdr"><span class="count" id="ver">v1.19</span><button class="addbtn" id="addBtn" type="button" aria-expanded="false" aria-controls="addBox" aria-label="הוספת קישור לסרטון"><span aria-hidden="true">+</span></button></div></header>
 
 
   <div class="addbox" id="addBox" hidden>
@@ -719,9 +726,9 @@ function defaultDays(places){
   // about 4–5 stops a day; the +/− buttons change it
   return Math.max(1, Math.round(located.length / 4.5));
 }
-function planDays(places, nDays, culinary = false){
-  const hotel = places.find(p => catOf(p) === "stay" && p.lat && p.lng) || null;
-  const pool = places.filter(p => p !== hotel);
+function planDays(places, nDays, culinary = false, myHotel = null){
+  const hotel = myHotel || places.find(p => catOf(p) === "stay" && p.lat && p.lng) || null;
+  const pool = places.filter(p => p !== hotel && !(hotel && catOf(p) === "stay"));
   const located = pool.filter(p => p.lat && p.lng);
   const rest = pool.filter(p => !(p.lat && p.lng));
   if (located.length >= 2) {
@@ -746,6 +753,22 @@ function shortList(places){
   const hotel = places.find(p => catOf(p) === "stay" && p.lat);
   return hotel ? pick.concat(hotel) : pick;
 }
+// The user's hotel for this list: every day starts there and ends there (a full loop).
+const routeHotels = () => store.get("ftm_hotels", {});
+const routeHotel = ctx => { const h = routeHotels()[routeKey(ctx)]; return h ? { ...h, id: "hotel", cat: "stay", category: "מקום" } : null; };
+const listCity = places => { const n = {}; places.forEach(p => { if (p.city) n[p.city] = (n[p.city] || 0) + 1; }); return Object.entries(n).sort((a, b) => b[1] - a[1])[0]?.[0] || state.res?.city || ""; };
+async function findHotel(text, city){
+  const center = city ? await cityCenter(city) : null;
+  const feats = await photon(city ? `${text} ${city}` : text, center, 8);
+  if (feats === null) return "retry";
+  const near = feats.filter(f => !center || kmBetween(center, f.geometry.coordinates) < geoRadius(city) + 20)
+    .filter(f => !["city", "town", "country", "state", "county"].includes(f.properties?.osm_value));
+  const hit = near.find(f => ["hotel", "hostel", "guest_house", "apartment", "motel"].includes(f.properties?.osm_value)) || near[0];
+  if (!hit) return null;
+  const pr = hit.properties || {};
+  return { name: pr.name || text, lat: hit.geometry.coordinates[1], lng: hit.geometry.coordinates[0],
+    address: [pr.street && (pr.street + (pr.housenumber ? " " + pr.housenumber : "")), pr.locality || pr.district, pr.city].filter(Boolean).join(", "), city };
+}
 // What the route is about: everything, only food (cafés, restaurants, bars, markets), or only sights
 // (landmarks, museums, nature, markets). The hotel always stays as the base.
 const FOCUS = { mix: null, food: ["food", "cafe", "bar", "shop"], sights: ["site", "museum", "nature", "shop"] };
@@ -765,7 +788,7 @@ function currentDaysFor(ctx, places, itinerary, culinary){
     return { byArea: true, rest: [], hotel: null, left: 0, days: itinerary.map(d => ({ day: d.day, title: d.title, name: d.title, stops: (d.stops || []).map(s => ({ p: byId[s.id], slot: s.slot })).filter(s => s.p) })).filter(d => d.stops.length) };
   }
   const use = mode === "short" ? shortList(places) : places;
-  const plan = planDays(use, Math.max(1, Math.min(use.length, n ?? defaultDays(use))), culinary);
+  const plan = planDays(use, Math.max(1, Math.min(use.length, n ?? defaultDays(use))), culinary, routeHotel(ctx));
   plan.left = places.length - use.length;
   return plan;
 }
@@ -773,6 +796,7 @@ function currentDaysFor(ctx, places, itinerary, culinary){
 const mapsLink = (p, city) => p.mapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(label(p, p.city || city))}`;
 function shareText(kind, title, places, city, plan){
   const lines = [`🗺️ ${title}`, ""];
+  if (kind === "route" && plan.hotel) lines.push(`🛏️ יוצאים וחוזרים ל: ${plan.hotel.name}`, "");
   if (kind === "route") {
     plan.days.forEach(d => {
       lines.push(`*יום ${d.day}: ${d.name || d.title || ""}*${d.best ? " ⭐" : ""}`);
@@ -829,12 +853,18 @@ function routeHTML(ctx, places, itinerary, city, title){
   const focusBar = `<div class="focus" role="group" aria-label="מה במסלול">${[["mix", "משולב", "other"], ["food", "קולינרי", "food"], ["sights", "רק אתרים", "site"]].map(([f, label, icon]) =>
     `<button data-routefocus="${ctx}|${f}" aria-pressed="${focus === f}" ${f !== "mix" && !nFocus(f) ? "disabled" : ""}>${f === "mix" ? "" : catIcon(icon)}${label} <span class="n">${nFocus(f)}</span></button>`).join("")}</div>`;
   if (!byFocus(places, focus).some(p => catOf(p) !== "stay")) return focusBar + emptyHTML("oops", "אין מקומות מהסוג הזה ברשימה", "");
+  const mine = routeHotel(ctx), fromList = !mine && places.find(p => catOf(p) === "stay" && p.lat);
+  const base = mine || fromList;
+  const hotelBox = state.hotelEdit === ctx
+    ? `<form class="hotelform" data-hotelform="${ctx}">${catIcon("stay")}<input id="hotelIn" placeholder="שם המלון או הכתובת" value="${esc(mine?.name || "")}" required><button class="primary-link" type="submit">שמירה</button><button class="small ghost" type="button" data-hotelcancel>ביטול</button></form>`
+    : base ? `<div class="hotelrow cat-stay">${catIcon("stay")}<span><b>${esc(base.name)}</b><span class="sub">כל יום יוצא מכאן וחוזר לכאן${fromList ? " (מהרשימה)" : ""}</span></span><button class="small ghost" data-hoteledit="${ctx}">שינוי</button>${mine ? `<button class="small ghost" data-hoteldel="${ctx}">הסרה</button>` : ""}</div>`
+    : `<button class="hoteladd" data-hoteledit="${ctx}">${catIcon("stay")}<span><b>איפה אתם ישנים?</b><span class="sub">הוסיפו את המלון, וכל יום יתחיל ויסתיים בו</span></span><span class="plus">+</span></button>`;
   const plan = currentDays(ctx, places, itinerary);
   const count = plan.days.length, mode = places.length >= 6 ? routeMode(ctx) : "full";
   const best = plan.days.find(d => d.best);
   const whyBest = best ? best.stops.map(s => s.p).sort((a, b) => interest(b) - interest(a)).slice(0, 2).map(p => p.name) : [];
-  return `${focusBar}${places.length >= 6 ? `<div class="seg" role="group" aria-label="סוג המסלול"><button data-routemode="${ctx}|short" aria-pressed="${mode === "short"}">הכי שווים</button><button data-routemode="${ctx}|full" aria-pressed="${mode !== "short"}">כל המקומות</button></div>` : ""}
-    <div class="row daysbar"><span class="sub">${plan.byArea ? (plan.hotel ? `כל יום מתחיל ונגמר ב־${esc(plan.hotel.name)}` : "כל יום באזור אחד") : "אין מספיק מיקומים לחלוקה לפי אזורים"}</span>
+  return `${focusBar}${hotelBox}${places.length >= 6 ? `<div class="seg" role="group" aria-label="סוג המסלול"><button data-routemode="${ctx}|short" aria-pressed="${mode === "short"}">הכי שווים</button><button data-routemode="${ctx}|full" aria-pressed="${mode !== "short"}">כל המקומות</button></div>` : ""}
+    <div class="row daysbar"><span class="sub">${plan.byArea ? (plan.hotel ? "מעגל מלא מהמלון ובחזרה" : "כל יום באזור אחד") : "אין מספיק מיקומים לחלוקה לפי אזורים"}</span>
       <span class="stepper"><button class="small" data-days="${ctx}|-1" aria-label="פחות ימים">−</button><span>${count} ימים</span><button class="small" data-days="${ctx}|1" aria-label="יותר ימים">+</button></span></div>
     ${best ? `<p class="bestnote">${pinny("wink", "best-pal")}<span>אם יש לכם רק יום אחד, הייתי הולך על <b>יום ${best.day}</b>: ${whyBest.map(esc).join(" ו־")}.</span></p>` : ""}
     ${shareRow(shareText("route", title, places, city, plan))}
@@ -1518,8 +1548,23 @@ function renderTabs(r){
   $("#tabs").innerHTML = tabs.map(([k,l,c]) => `<button role="tab" aria-selected="${state.tab===k}" data-tab="${k}">${l} <span class="count">${c}</span></button>`).join("");
 }
 
+// saving the hotel: look the name/address up on the map near the trip's city
+document.addEventListener("submit", async e => {
+  const f = e.target.closest("[data-hotelform]"); if (!f) return;
+  e.preventDefault();
+  const ctx = f.dataset.hotelform, text = $("#hotelIn").value.trim(); if (!text) return;
+  const folder = ctx.startsWith("f:") ? state.folders.find(x => "f:" + x.id === ctx) : null;
+  const city = folder ? listCity(folder.places) : (state.res?.city || "");
+  const btn = f.querySelector("[type=submit]"); btn.disabled = true; btn.textContent = "מחפש…";
+  const h = await findHotel(text, city).catch(() => "retry");
+  if (!h || h === "retry") { btn.disabled = false; btn.textContent = "שמירה"; setStatus(h === "retry" ? "אין חיבור למפה כרגע. נסו שוב בעוד רגע." : `לא מצאתי את "${text}"${city ? " ב־" + (HE_CITY[city] || city) : ""}. נסו להוסיף את שם הרחוב.`, true); return; }
+  const all = routeHotels(); all[routeKey(ctx)] = h; store.set("ftm_hotels", all);
+  state.hotelEdit = null; delete state.days[ctx];
+  setStatus(`מעולה, כל יום במסלול יתחיל ויסתיים ב־${h.name}.`);
+  render();
+});
 document.addEventListener("click", e => {
-  const t = e.target.closest("[data-routefocus],[data-routemode],[data-showmap],[data-mymaps],[data-catf],[data-ocr],[data-tab],[data-save],[data-remove],[data-del],[data-folder],[data-pick],[data-days],[data-share],.place,#addAll,[data-video],[data-delvideo],#showAll,#backFolders,#delFolderAsk,#delFolderYes,#delFolderNo,#sheetClose,#sheet");
+  const t = e.target.closest("[data-hoteledit],[data-hotelcancel],[data-hoteldel],[data-routefocus],[data-routemode],[data-showmap],[data-mymaps],[data-catf],[data-ocr],[data-tab],[data-save],[data-remove],[data-del],[data-folder],[data-pick],[data-days],[data-share],.place,#addAll,[data-video],[data-delvideo],#showAll,#backFolders,#delFolderAsk,#delFolderYes,#delFolderNo,#sheetClose,#sheet");
   if (!t) return;
   if (t.id === "sheet") { if (e.target === t) { state.pick = null; renderSheet(); } return; }
   if (t.id === "sheetClose") { state.pick = null; renderSheet(); return; }
@@ -1541,6 +1586,9 @@ document.addEventListener("click", e => {
   if (t.matches("[data-ocr]")) { if (state.res) { delete state.res.ocrFailed; ocrVideo(state.res); } return; }
   if (t.matches("[data-mymaps]")) { exportMyMaps(); return; }
   if (t.matches("[data-share]")) { navigator.share({ text: decodeURIComponent(t.dataset.share) }).catch(() => {}); return; }
+  if (t.matches("[data-hoteledit]")) { state.hotelEdit = t.dataset.hoteledit; render(); setTimeout(() => $("#hotelIn")?.focus(), 30); return; }
+  if (t.matches("[data-hotelcancel]")) { state.hotelEdit = null; render(); return; }
+  if (t.matches("[data-hoteldel]")) { const h = routeHotels(); delete h[routeKey(t.dataset.hoteldel)]; store.set("ftm_hotels", h); render(); return; }
   if (t.matches("[data-routefocus]")) {
     const [ctx, f] = t.dataset.routefocus.split("|");
     const m = routeFoci(); m[routeKey(ctx)] = f; store.set("ftm_routefocus", m); delete state.days[ctx];
