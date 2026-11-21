@@ -295,6 +295,21 @@ body.busy .status::after,body.busy #geoNote::after{animation:bob 1s ease-in-out 
 .reset{align-items:center}
 .card.nomap .map,.card.nomap .mapbar{display:none}
 @media (prefers-color-scheme: dark){.daynum,.vsum b{color:var(--pin)}}
+/* ---- category icons ---- */
+.cat-food{--ci:#D9553A}.cat-cafe{--ci:#B07415}.cat-bar{--ci:#C23E6B}.cat-site{--ci:#3A5FC4}.cat-museum{--ci:#7447D1}.cat-nature{--ci:#24855B}.cat-shop{--ci:#B03F96}.cat-stay{--ci:#2A78A8}.cat-other{--ci:var(--muted)}
+@media (prefers-color-scheme: dark){.cat-food{--ci:#FF9C82}.cat-cafe{--ci:#F2C46B}.cat-bar{--ci:#FF8DB7}.cat-site{--ci:#9FB6FF}.cat-museum{--ci:#C6A8FF}.cat-nature{--ci:#7FDCAE}.cat-shop{--ci:#F59BDF}.cat-stay{--ci:#8ED0FF}}
+.ci{width:1em;height:1em;flex:0 0 auto;color:var(--ci,currentColor)}
+.thumb .ci.big{width:38px;height:38px;stroke-width:1.6}
+.dot .ci{width:19px;height:19px}
+.tile .ci{width:24px;height:24px}
+.tile:first-child .ci{width:38px;height:38px;stroke-width:1.6}
+.cat-inline{display:inline-flex;align-items:center;gap:4px;background:none!important;color:var(--ci);font-weight:500}
+.cat-inline .ci{width:15px;height:15px;stroke-width:2}
+.catbar button{display:inline-flex;align-items:center;gap:6px}
+.catbar button .ci{width:17px;height:17px;stroke-width:2}
+.catbar button .n{color:var(--muted);font-size:12px}
+.catbar button[class*="cat-"]{background:var(--surface)}
+.catbar button[aria-pressed="true"] .ci,.catbar button[aria-pressed="true"] .n{color:inherit}
 @media (min-width:600px){.card,.tabs,.catbar,.vids{margin-inline:0}.map{border-radius:18px;overflow:hidden}.tabs{padding:0}}
 @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
 </style>
@@ -302,7 +317,7 @@ body.busy .status::after,body.busy #geoNote::after{animation:bob 1s ease-in-out 
 <body>
 <main class="app">
   <header class="brand"><div class="logo"><svg class="pal" viewBox="0 0 64 80" aria-hidden="true"><path d="M32 4C18 4 7 15 7 29c0 19 25 45 25 45s25-26 25-45C57 15 46 4 32 4z" fill="var(--pin)"/><ellipse cx="18.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><ellipse cx="45.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><circle cx="24" cy="28" r="3.4" fill="var(--face)"/><circle cx="40" cy="28" r="3.4" fill="var(--face)"/><circle cx="25.3" cy="26.8" r="1.1" fill="#fff"/><circle cx="41.3" cy="26.8" r="1.1" fill="#fff"/><path d="M26.5 36.5q5.5 4.6 11 0" stroke="var(--face)" stroke-width="2.6" fill="none" stroke-linecap="round"/></svg><h1 dir="ltr">FeedTrip</h1></div>
-    <div class="hdr"><span class="count" id="ver">v1.10</span><button class="addbtn" id="addBtn" type="button" aria-expanded="false" aria-controls="addBox" aria-label="הוספת קישור לסרטון"><span aria-hidden="true">+</span></button></div></header>
+    <div class="hdr"><span class="count" id="ver">v1.11</span><button class="addbtn" id="addBtn" type="button" aria-expanded="false" aria-controls="addBox" aria-label="הוספת קישור לסרטון"><span aria-hidden="true">+</span></button></div></header>
 
 
   <div class="addbox" id="addBox" hidden>
@@ -634,9 +649,9 @@ function routeHTML(ctx, places, itinerary, city, title){
     ${shareRow(shareText("route", title, places, city, plan))}
     ${plan.days.map(d => `<div class="day"><div class="dayhead"><span class="daynum"><small>יום</small>${esc(d.day)}</span><span class="daytitle"><b>${d.title ? esc(d.title) : "יום " + esc(d.day)}</b><span class="sub">${d.stops.length} עצירות</span></span>
       <a class="btn small primary-link" target="_blank" rel="noopener" href="${openRoute(d.stops.map(s => s.p), city)}">ניווט</a></div>
-      <ol class="stops">${d.stops.map(s => `<li><span class="dot cat-${catOf(s.p)}" aria-hidden="true">${CATS[catOf(s.p)].icon}</span><span class="stop"><b>${esc(s.p.name)}</b><span class="sub">${[s.slot, areaOf(s.p) && areaOf(s.p) !== d.title ? areaOf(s.p) : ""].filter(Boolean).map(esc).join(" · ")}</span></span><span class="snum">${places.indexOf(s.p) + 1}</span></li>`).join("")}</ol></div>`).join("")}
+      <ol class="stops">${d.stops.map(s => `<li><span class="dot cat-${catOf(s.p)}">${catIcon(catOf(s.p))}</span><span class="stop"><b>${esc(s.p.name)}</b><span class="sub">${[s.slot, areaOf(s.p) && areaOf(s.p) !== d.title ? areaOf(s.p) : ""].filter(Boolean).map(esc).join(" · ")}</span></span><span class="snum">${places.indexOf(s.p) + 1}</span></li>`).join("")}</ol></div>`).join("")}
     ${plan.rest.length ? `<div class="day rest"><h3>עוד מקומות</h3><p class="sub" style="margin:0">לא מצאתי להם מיקום מדויק, ולכן לא שובצו ביום. לחץ עליהם ברשימה כדי לראות אותם במפה.</p>
-      <ol class="stops">${plan.rest.map(p => `<li><span class="dot cat-${catOf(p)}" aria-hidden="true">${CATS[catOf(p)].icon}</span><span class="stop"><b>${esc(p.name)}</b></span><span class="snum">${places.indexOf(p) + 1}</span></li>`).join("")}</ol></div>` : ""}
+      <ol class="stops">${plan.rest.map(p => `<li><span class="dot cat-${catOf(p)}">${catIcon(catOf(p))}</span><span class="stop"><b>${esc(p.name)}</b></span><span class="snum">${places.indexOf(p) + 1}</span></li>`).join("")}</ol></div>` : ""}
     <p class="sub">"ניווט ביום הזה" פותח את מפות Google עם כל התחנות של היום, לפי הסדר.</p>`;
 }
 
@@ -1021,6 +1036,18 @@ const CATS = {
   stay:   { label: "לינה", icon: "🛏️" },
   other:  { label: "מקום", icon: "📍" },
 };
+const CAT_SVG = {
+  food:   '<path d="M7 3v8M5 3v5a2 2 0 0 0 4 0V3M7 11v10"/><path d="M17.5 21V3c-2.2 1.6-3 4.6-3 8h3"/>',
+  cafe:   '<path d="M4 10h12v4a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5z"/><path d="M16 11.5h1.3a2.6 2.6 0 0 1 0 5.2H15.6"/><path d="M8 3.5c-.9 1 .9 1.8 0 3M12 3.5c-.9 1 .9 1.8 0 3"/>',
+  bar:    '<path d="M7 3h10l-.6 5.2a4.4 4.4 0 0 1-8.8 0z"/><path d="M7.4 6.8h9.2M12 12.6V21M8.5 21h7"/>',
+  site:   '<path d="M3.5 9 12 4.5 20.5 9"/><path d="M5.5 9.5v8M10 9.5v8M14 9.5v8M18.5 9.5v8M3.5 20.5h17M4.5 17.5h15"/>',
+  museum: '<rect x="3.5" y="5" width="17" height="14" rx="2.5"/><path d="m7 16 3.4-4 2.8 3 1.8-2 2.5 3"/><circle cx="15.3" cy="9.3" r="1.2"/>',
+  nature: '<path d="M3 19.5 9.2 11l3.8 5 2.4-3 5.6 6.5z"/><circle cx="16.8" cy="6.2" r="2.1"/>',
+  shop:   '<path d="M5.2 8h13.6l-1 12.2H6.2z"/><path d="M9 10V6.8a3 3 0 0 1 6 0V10"/>',
+  stay:   '<path d="M3 5.5v14M3 15h18v4.5M21 15v-2.2A3.3 3.3 0 0 0 17.7 9.5H11V15"/><circle cx="7" cy="11.6" r="1.8"/>',
+  other:  '<path d="M12 21s-6.3-5.7-6.3-10.4a6.3 6.3 0 0 1 12.6 0C18.3 15.3 12 21 12 21z"/><circle cx="12" cy="10.6" r="2.3"/>',
+};
+const catIcon = (k, cls = "") => `<svg class="ci ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${CAT_SVG[k] || CAT_SVG.other}</svg>`;
 const CAT_WORDS = {
   museum: "museum museums musei museo musée museu muzeum gallery galleria galerie exhibition מוזיאון גלריה תערוכה",
   cafe:   "cafe café caffè caffe coffee kaffee bakery pasticceria patisserie pâtisserie boulangerie gelato gelateria dessert desserts chocolate chocolaterie donut kurtos trdelnik bakehouse brunch קפה מאפה מאפייה גלידה קינוח קינוחים שוקו קיורטוש עוגה עוגות מתוקים מריטוצו קרואסון בראנץ'",
@@ -1100,7 +1127,7 @@ const flagOf = name => FLAGS[String(name || "").trim()] || "📍";
 function folderTiles(f){
   const withImg = f.places.filter(p => p.img).slice(0, 3);
   const tiles = withImg.map(p => `<span class="tile"><img src="${esc(p.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()"></span>`);
-  for (const p of f.places) { if (tiles.length >= 3) break; if (!p.img) tiles.push(`<span class="tile cat-${catOf(p)}">${CATS[catOf(p)].icon}</span>`); }
+  for (const p of f.places) { if (tiles.length >= 3) break; if (!p.img) tiles.push(`<span class="tile cat-${catOf(p)}">${catIcon(catOf(p))}</span>`); }
   return `<span class="tiles">${tiles.join("") || `<span class="tile">${flagOf(f.name)}</span>`}</span>`;
 }
 
@@ -1109,9 +1136,9 @@ function placeHTML(p, i, city, inFolder){
   const f = inFolder ? null : folderOf(withCity(p));
   const c = catOf(p);
   const credit = p.img ? `<a class="credit" href="${esc(p.imgSrc)}" target="_blank" rel="noopener" data-stop>תמונה: ${p.imgBy ? "גוגל · " + esc(p.imgBy) : "ויקיפדיה"}</a>` : "";
-  const line = [`${CATS[c].icon} ${CATS[c].label}`, inFolder && p.city ? esc(HE_CITY[p.city] || p.city) : "", areaOf(p) ? esc(areaOf(p)) : (p.neighborhood ? esc(p.neighborhood) : ""), p.price ? esc(p.price) : ""].filter(Boolean).join(" · ");
+  const line = [`<span class="cat-inline cat-${c}">${catIcon(c)}${CATS[c].label}</span>`, inFolder && p.city ? esc(HE_CITY[p.city] || p.city) : "", areaOf(p) ? esc(areaOf(p)) : (p.neighborhood ? esc(p.neighborhood) : ""), p.price ? esc(p.price) : ""].filter(Boolean).join(" · ");
   return `<li class="place ${state.sel===i?"sel":""}" data-i="${i}">
-    <div class="thumb cat-${c}">${p.img ? `<img src="${esc(p.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : `<span class="emo" aria-hidden="true">${CATS[c].icon}</span>`}<span class="num">${i+1}</span></div>
+    <div class="thumb cat-${c}">${p.img ? `<img src="${esc(p.img)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : catIcon(c, "big")}<span class="num">${i+1}</span></div>
     <div class="body">
       <h3>${esc(p.name)}</h3>${p.local && p.local!==p.name?`<div class="local">${esc(p.local)}</div>`:""}
       <div class="line">${line}</div>
@@ -1163,7 +1190,7 @@ function render(){
   const present = Object.keys(CATS).filter(k => allPlaces.some(p => catOf(p) === k));
   if (state.catFilter && !present.includes(state.catFilter)) state.catFilter = null;
   const shown = allPlaces.map((p, i) => [p, i]).filter(([p]) => !state.catFilter || catOf(p) === state.catFilter);
-  const catbar = present.length > 1 ? `<div class="catbar" role="group" aria-label="סינון לפי קטגוריה"><button data-catf="" aria-pressed="${!state.catFilter}">הכל ${allPlaces.length}</button>${present.map(k => `<button class="cat-${k}" data-catf="${k}" aria-pressed="${state.catFilter === k}">${CATS[k].icon} ${CATS[k].label} ${allPlaces.filter(p => catOf(p) === k).length}</button>`).join("")}</div>` : "";
+  const catbar = present.length > 1 ? `<div class="catbar" role="group" aria-label="סינון לפי קטגוריה"><button data-catf="" aria-pressed="${!state.catFilter}">הכל ${allPlaces.length}</button>${present.map(k => `<button class="cat-${k}" data-catf="${k}" aria-pressed="${state.catFilter === k}">${catIcon(k)}${CATS[k].label} <span class="n">${allPlaces.filter(p => catOf(p) === k).length}</span></button>`).join("")}</div>` : "";
   const places = allPlaces;
   const city = folder ? (places[0]?.city || "") : (r.city || "");
   const mode = folder ? (places.every(p => p.lat) ? "full" : "simple") : r.mode;
