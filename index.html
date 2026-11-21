@@ -331,6 +331,19 @@ body.busy .status::after,body.busy #geoNote::after{animation:bob 1s ease-in-out 
 .corner .num,.corner .mapbtn{position:static;box-shadow:0 2px 8px rgba(0,0,0,.2)}
 .corner .num{min-width:28px;height:28px;font-size:13px}
 .place.wide.sel .bigimg{box-shadow:0 0 0 2.5px var(--surface),0 0 0 5px var(--pin)}
+/* ---- route: question, choice, best day ---- */
+.askroute{display:flex;gap:14px;align-items:flex-start;background:var(--surface);border-radius:22px;padding:18px;box-shadow:var(--shadow);margin-top:12px}
+.askroute .ask-pal{flex:0 0 44px;height:55px;animation:bob 3.2s ease-in-out infinite}
+.askroute b{font-family:var(--f-display);font-weight:400;font-size:19px}
+.askroute p{margin:4px 0 12px;color:var(--muted)}
+.seg{display:flex;gap:4px;background:var(--soft);border-radius:14px;padding:4px;margin:12px 0 4px}
+.seg button{flex:1;border:0;background:transparent;border-radius:10px;padding:8px;color:var(--muted);font-weight:500}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 2px 8px rgba(59,54,84,.08)}
+.bestnote{display:flex;gap:10px;align-items:center;margin:0 0 12px;background:var(--sel);border-radius:18px;padding:10px 14px;font-size:14.5px}
+.bestnote .best-pal{flex:0 0 26px;height:33px}
+.day.best{box-shadow:0 0 0 2px var(--pin),var(--shadow)}
+.besttag{align-self:flex-start;font-size:11.5px;font-weight:600;color:#C2456A;background:var(--sel);border-radius:8px;padding:1px 8px;margin-bottom:3px}
+@media (prefers-color-scheme: dark){.besttag{color:var(--pin)}}
 @media (min-width:600px){.card,.tabs,.catbar,.vids{margin-inline:0}.map{border-radius:18px;overflow:hidden}.tabs{padding:0}}
 @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
 </style>
@@ -338,7 +351,7 @@ body.busy .status::after,body.busy #geoNote::after{animation:bob 1s ease-in-out 
 <body>
 <main class="app">
   <header class="brand"><div class="logo"><svg class="pal" viewBox="0 0 64 80" aria-hidden="true"><path d="M32 4C18 4 7 15 7 29c0 19 25 45 25 45s25-26 25-45C57 15 46 4 32 4z" fill="var(--pin)"/><ellipse cx="18.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><ellipse cx="45.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><circle cx="24" cy="28" r="3.4" fill="var(--face)"/><circle cx="40" cy="28" r="3.4" fill="var(--face)"/><circle cx="25.3" cy="26.8" r="1.1" fill="#fff"/><circle cx="41.3" cy="26.8" r="1.1" fill="#fff"/><path d="M26.5 36.5q5.5 4.6 11 0" stroke="var(--face)" stroke-width="2.6" fill="none" stroke-linecap="round"/></svg><h1 dir="ltr">FeedTrip</h1></div>
-    <div class="hdr"><span class="count" id="ver">v1.15</span><button class="addbtn" id="addBtn" type="button" aria-expanded="false" aria-controls="addBox" aria-label="הוספת קישור לסרטון"><span aria-hidden="true">+</span></button></div></header>
+    <div class="hdr"><span class="count" id="ver">v1.16</span><button class="addbtn" id="addBtn" type="button" aria-expanded="false" aria-controls="addBox" aria-label="הוספת קישור לסרטון"><span aria-hidden="true">+</span></button></div></header>
 
 
   <div class="addbox" id="addBox" hidden>
@@ -420,10 +433,11 @@ function embedOne(p, city){
   return `https://maps.google.com/maps?output=embed&hl=he&z=16&q=${encodeURIComponent(label(p, city))}${isFinite(p.lat)&&p.lat?`&ll=${p.lat},${p.lng}`:""}`;
 }
 const openOne = (p, city) => p.mapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(label(p, city))}`;
-function openRoute(places, city){
+function openRoute(places, city, transit = false, hotel = null){
+  if (hotel) places = [hotel, ...places, hotel];
   const q = places.slice(0, 10).map(p => encodeURIComponent(loc(p, city)));
   if (q.length < 2) return places[0] ? openOne(places[0], city) : "#";
-  let u = `https://www.google.com/maps/dir/?api=1&travelmode=walking&origin=${q[0]}&destination=${q[q.length-1]}`;
+  let u = `https://www.google.com/maps/dir/?api=1&travelmode=${transit ? "transit" : "walking"}&origin=${q[0]}&destination=${q[q.length-1]}`;
   if (q.length > 2) u += `&waypoints=${q.slice(1,-1).join("%7C")}`;
   return u;
 }
@@ -562,10 +576,15 @@ function renderSheet(){
   });
 }
 
-/* ---- route: from the video when it has one, otherwise split the places into days ---- */
-const SLOTS = ["בוקר", "צהריים", "אחה״צ", "ערב", "ערב", "לילה"];
-/* ---- route by area: places with a location are grouped so each day stays in one area ---- */
+/* ---- route planning ----
+   1. Which places: all of them, or (if the user chose) a short route of the most interesting ones.
+   2. Days by area: nearby places are grouped (k-means), each day up to 6 stops; a lone place joins its nearest day.
+   3. Order in a day: by the time of day that suits each kind of place (café → sights → lunch → … → dinner → bar),
+      and within that by walking distance. A hotel among the places is where each day starts and ends.
+   4. Clock times from typical visit lengths and walking time; distance per day decides walking or transit.
+   5. Each day gets a title from what's in it, and the day with the best places is recommended. */
 const dist = (a, b) => { const k = Math.cos((a.lat + b.lat) / 2 * Math.PI / 180); return Math.hypot(a.lat - b.lat, (a.lng - b.lng) * k); };
+const km = (a, b) => dist(a, b) * 111.2;
 function kmeans(pts, k){
   // farthest-point start, then a few rounds of k-means
   let cent = [pts[0]];
@@ -578,10 +597,20 @@ function kmeans(pts, k){
   }
   return cent.map((_, i) => pts.filter((_, j) => group[j] === i)).filter(g => g.length);
 }
-function walkOrder(g){
-  // start at the most western place and always walk to the nearest one left
-  const left = [...g].sort((a, b) => a.lng - b.lng), out = [left.shift()];
-  while (left.length) { const last = out[out.length - 1]; left.sort((a, b) => dist(last, a) - dist(last, b)); out.push(left.shift()); }
+const center = g => ({ lat: g.reduce((s, p) => s + p.lat, 0) / g.length, lng: g.reduce((s, p) => s + p.lng, 0) / g.length });
+const MAX_STOPS = 6;
+// split crowded days; fold thin days (1–2 stops) into the nearest day that still has room, if it is close by
+function balance(groups){
+  const out = [];
+  for (const g of groups) out.push(...(g.length > MAX_STOPS ? kmeans(g, Math.ceil(g.length / MAX_STOPS)) : [g]));
+  for (;;) {
+    const i = out.map((g, i) => [i, g.length]).filter(([i, n]) => n <= 2 && !out[i].lonely).sort((a, b) => a[1] - b[1])[0]?.[0];
+    if (i == null || out.length < 2) break;
+    const c = center(out[i]), limit = out[i].length === 1 ? 6 : 3.5;
+    const j = out.map((g, j) => [j, km(c, center(g))]).filter(([j, d]) => j !== i && out[j].length + out[i].length <= MAX_STOPS && d < limit).sort((a, b) => a[1] - b[1])[0]?.[0];
+    if (j == null) { out[i].lonely = true; continue; }
+    out[j] = out[j].concat(out[i]); out.splice(i, 1);
+  }
   return out;
 }
 const areaOf = p => p.area || (p.neighborhood && /[A-Za-zÀ-ÿ]/.test(p.neighborhood) ? p.neighborhood : "") || "";
@@ -589,42 +618,119 @@ function areaTitle(g){
   const c = {}; g.forEach(p => { const a = areaOf(p); if (a) c[a] = (c[a] || 0) + 1; });
   return Object.entries(c).sort((x, y) => y[1] - x[1]).slice(0, 2).map(([a]) => a).join(" · ");
 }
+// how worth-it a place looks: a known sight, a strong Google rating, or the creator raving about it
+const HYPE = /הכי|חובה|מושלם|מטורף|מדהים|אסור לפספס|שווה|מומלץ|אגדי|must|best|amazing|favou?rite|incredible|unreal|hidden gem|iconic/i;
+function interest(p){
+  const c = catOf(p);
+  let s = 1 + ({ site: 1.2, museum: 1, nature: 1.2, food: 0.8, cafe: 0.6, bar: 0.5, shop: 0.4, stay: -5, other: 0 }[c] ?? 0);
+  if (p.wiki) s += 1.2;
+  if (p.rating) s += (p.rating - 4) * 2 + Math.min(1.5, Math.log10((p.ratingCount || 0) + 1) / 2);
+  if (HYPE.test(p.why || "")) s += 1;
+  if (p.from === "speech") s += 0.3;
+  if (p.img) s += 0.3;
+  return s;
+}
+// time of day that suits each kind of place, and how long a visit usually takes (minutes)
+const WHEN = { cafe: 0, site: 1, museum: 1, nature: 1, shop: 1, other: 1, food: 2, bar: 3, stay: 1 };
+const STAY_MIN = { cafe: 40, site: 60, museum: 110, nature: 80, shop: 45, other: 40, food: 70, bar: 80, stay: 0 };
+const hhmm = m => `${String(Math.floor(m / 60) % 24).padStart(2, "0")}:${String(Math.round(m % 60)).padStart(2, "0")}`;
+function orderDay(g, hotel){
+  // cafés first, then sights; one meal at midday when the day has sights, the other meals in the evening; bars last
+  const by = w => g.filter(p => (WHEN[catOf(p)] ?? 1) === w);
+  const morning = by(0), day = by(1), meals = by(2), night = by(3);
+  const chain = (list, from) => { const left = [...list], out = []; let at = from; while (left.length) { left.sort((a, b) => dist(at, a) - dist(at, b)); at = left.shift(); out.push(at); } return out; };
+  const start = hotel || [...morning, ...day, ...meals, ...night].sort((a, b) => a.lng - b.lng)[0];
+  const m1 = chain(morning, start);
+  const dayOrd = chain(day, m1[m1.length - 1] || start);
+  const half = Math.ceil(dayOrd.length / 2);
+  const near = dayOrd[half - 1];
+  const lunch = dayOrd.length >= 2 && meals.length ? [[...meals].sort((a, b) => dist(near, a) - dist(near, b))[0]] : [];
+  const seq = [...m1, ...dayOrd.slice(0, half), ...lunch, ...dayOrd.slice(half)];
+  seq.push(...chain(meals.filter(p => !lunch.includes(p)), seq[seq.length - 1] || start));
+  seq.push(...chain(night, seq[seq.length - 1] || start));
+  // clock times: start 9:00 (10:00 without a café); walking ~4.5 km/h, ×1.3 for real streets;
+  // lunch not before 12:30, dinner not before 19:00, bars not before 21:00
+  let t = morning.length ? 9 * 60 : 10 * 60, prev = hotel || null, walked = 0, maxLeg = 0;
+  const stops = seq.map(p => {
+    if (prev) { const d = km(prev, p) * 1.3; walked += d; maxLeg = Math.max(maxLeg, d); t += d / 4.5 * 60; }
+    const c = catOf(p);
+    if (c === "food") t = Math.max(t, (lunch.includes(p) ? 12.5 : 19) * 60);
+    if (c === "bar") t = Math.max(t, 21 * 60);
+    const s = { p, slot: hhmm(Math.round(t / 5) * 5) };
+    t += STAY_MIN[c] ?? 40; prev = p;
+    return s;
+  });
+  if (hotel && prev) walked += km(prev, hotel) * 1.3;
+  return { stops, km: walked, maxLeg };
+}
+function dayName(g, area){
+  const n = {}; g.forEach(p => { const c = catOf(p); n[c] = (n[c] || 0) + 1; });
+  const has = c => n[c] || 0, half = g.length / 2;
+  const at = area ? ` ב־${area.split(" · ")[0]}` : "";
+  if (has("museum") >= 2) return "יום של מוזיאונים" + at;
+  if (has("food") + has("cafe") >= half && has("bar")) return "אוכל ובילוי" + at;
+  if (has("cafe") >= half && has("cafe") >= 2) return "בוקר מתוק" + at;
+  if (has("food") + has("cafe") >= half) return "יום של טעמים" + at;
+  if (has("nature") >= half) return "יום בטבע" + at;
+  if (has("site") + has("museum") >= half) return "הקלאסיקות" + at;
+  if (has("shop") >= half) return "שווקים וקניות" + at;
+  if (has("bar") >= half) return "לילה בעיר" + at;
+  return "קצת מהכל" + at;
+}
 function defaultDays(places){
-  const located = places.filter(p => p.lat);
+  const located = places.filter(p => p.lat && catOf(p) !== "stay");
   if (located.length < 2) return Math.max(1, Math.ceil(places.length / 4));
-  const areas = new Set(located.map(areaOf).filter(Boolean)).size || 1;
-  return Math.max(1, Math.min(areas, Math.ceil(located.length / 2)));
+  // about 4–5 stops a day; the +/− buttons change it
+  return Math.max(1, Math.round(located.length / 4.5));
 }
 function planDays(places, nDays){
-  const located = places.filter(p => p.lat && p.lng);
-  const rest = places.filter(p => !(p.lat && p.lng));
+  const hotel = places.find(p => catOf(p) === "stay" && p.lat && p.lng) || null;
+  const pool = places.filter(p => p !== hotel);
+  const located = pool.filter(p => p.lat && p.lng);
+  const rest = pool.filter(p => !(p.lat && p.lng));
   if (located.length >= 2) {
     const k = Math.max(1, Math.min(nDays, located.length));
-    const groups = kmeans(located, k).map(walkOrder).sort((a, b) => b.length - a.length);
-    return { byArea: true, rest, days: groups.map((g, d) => ({ day: d + 1, title: areaTitle(g), stops: g.map((p, j) => ({ p, slot: SLOTS[Math.min(j, SLOTS.length - 1)] })) })) };
+    const days = balance(kmeans(located, k)).map(g => { const o = orderDay(g, hotel); const area = areaTitle(g);
+      return { title: area, name: dayName(g, area), stops: o.stops, km: o.km, transit: o.km > 6 || o.maxLeg > 2.5, score: g.map(interest).sort((a, b) => b - a).slice(0, 3).reduce((a, b) => a + b, 0) }; })
+      .sort((a, b) => b.stops.length - a.stops.length).map((d, i) => ({ ...d, day: i + 1 }));
+    if (days.length > 1) days.reduce((a, b) => b.score > a.score ? b : a).best = true;
+    return { byArea: true, rest, days, hotel };
   }
-  const per = Math.ceil(places.length / nDays), days = [];
-  for (let d = 0; d < nDays; d++) { const chunk = places.slice(d * per, d * per + per); if (chunk.length) days.push({ day: d + 1, title: "", stops: chunk.map((p, j) => ({ p, slot: SLOTS[Math.min(j, SLOTS.length - 1)] })) }); }
-  return { byArea: false, rest: [], days };
+  const per = Math.ceil(pool.length / nDays), days = [];
+  for (let d = 0; d < nDays; d++) { const chunk = pool.slice(d * per, d * per + per); if (chunk.length) days.push({ day: d + 1, title: "", name: dayName(chunk, ""), stops: chunk.map(p => ({ p, slot: "" })) }); }
+  return { byArea: false, rest: [], days, hotel: null };
+}
+// The user's choice for this list: the full route, or a short one of the most interesting places.
+const routeKey = ctx => ctx === "v" ? "v:" + (state.res?.key || "") : ctx;
+const routeModes = () => store.get("ftm_routemode", {});
+const routeMode = ctx => routeModes()[routeKey(ctx)] || null;
+const shortCount = n => Math.max(4, Math.min(12, Math.round(n * 0.5)));
+function shortList(places){
+  const pick = [...places].filter(p => catOf(p) !== "stay").sort((a, b) => interest(b) - interest(a)).slice(0, shortCount(places.length));
+  const hotel = places.find(p => catOf(p) === "stay" && p.lat);
+  return hotel ? pick.concat(hotel) : pick;
 }
 function currentDays(ctx, places, itinerary){
   const n = state.days[ctx];
-  if (itinerary?.length && n == null) {
+  const mode = places.length >= 6 ? routeMode(ctx) : "full";
+  if (itinerary?.length && n == null && mode !== "short") {
     const byId = Object.fromEntries(places.map(p => [p.id, p]));
-    return { byArea: true, rest: [], days: itinerary.map(d => ({ day: d.day, title: d.title, stops: (d.stops || []).map(s => ({ p: byId[s.id], slot: s.slot })).filter(s => s.p) })).filter(d => d.stops.length) };
+    return { byArea: true, rest: [], hotel: null, left: 0, days: itinerary.map(d => ({ day: d.day, title: d.title, name: d.title, stops: (d.stops || []).map(s => ({ p: byId[s.id], slot: s.slot })).filter(s => s.p) })).filter(d => d.stops.length) };
   }
-  return planDays(places, Math.max(1, Math.min(places.length, n ?? defaultDays(places))));
+  const use = mode === "short" ? shortList(places) : places;
+  const plan = planDays(use, Math.max(1, Math.min(use.length, n ?? defaultDays(use))));
+  plan.left = places.length - use.length;
+  return plan;
 }
-
 /* ---- sharing on WhatsApp ---- */
 const mapsLink = (p, city) => p.mapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(label(p, p.city || city))}`;
 function shareText(kind, title, places, city, plan){
   const lines = [`🗺️ ${title}`, ""];
   if (kind === "route") {
     plan.days.forEach(d => {
-      lines.push(`*יום ${d.day}${d.title ? " · " + d.title : ""}*`);
-      d.stops.forEach(s => lines.push(`${places.indexOf(s.p) + 1}. ${CATS[catOf(s.p)].icon} ${s.p.name}${s.slot ? " (" + s.slot + ")" : ""}`));
-      lines.push(`ניווט ביום הזה: ${openRoute(d.stops.map(s => s.p), city)}`, "");
+      lines.push(`*יום ${d.day}: ${d.name || d.title || ""}*${d.best ? " ⭐" : ""}`);
+      d.stops.forEach(s => lines.push(`${s.slot ? s.slot + " " : ""}${CATS[catOf(s.p)].icon} ${s.p.name}`));
+      lines.push(`ניווט ביום הזה: ${openRoute(d.stops.map(s => s.p), city, d.transit, plan.hotel)}`, "");
     });
     if (plan.rest.length) { lines.push("*עוד מקומות (בלי מיקום מאומת)*"); plan.rest.forEach(p => lines.push(`• ${p.name}: ${mapsLink(p, city)}`)); lines.push(""); }
   } else {
@@ -663,17 +769,28 @@ function exportMyMaps(){
 
 function routeHTML(ctx, places, itinerary, city, title){
   if (!places.length) return emptyHTML("oops", "אין עדיין מקומות למסלול", "");
+  // first time on a longer list: Pinny asks which kind of route to build
+  if (places.length >= 6 && !routeMode(ctx)) {
+    const n = shortCount(places.length);
+    return `<div class="askroute">${pinny("happy", "ask-pal")}<div><b>איזה מסלול לבנות?</b><p>יש כאן ${places.length} מקומות. לבנות מסלול מכולם, או מסלול מקוצר עם ${n} המקומות הכי שווים?</p>
+      <div class="row"><button class="primary-link" data-routemode="${ctx}|short">רק הכי שווים (${n})</button><button class="small" data-routemode="${ctx}|full">את כולם (${places.length})</button></div></div></div>`;
+  }
   const plan = currentDays(ctx, places, itinerary);
-  const count = plan.days.length;
-  return `<div class="row daysbar"><span class="sub">${plan.byArea ? "כל יום באזור אחד" : "אין מספיק מיקומים לחלוקה לפי אזורים, המסלול לפי סדר המקומות"}</span>
+  const count = plan.days.length, mode = places.length >= 6 ? routeMode(ctx) : "full";
+  const best = plan.days.find(d => d.best);
+  const whyBest = best ? best.stops.map(s => s.p).sort((a, b) => interest(b) - interest(a)).slice(0, 2).map(p => p.name) : [];
+  return `${places.length >= 6 ? `<div class="seg" role="group" aria-label="סוג המסלול"><button data-routemode="${ctx}|short" aria-pressed="${mode === "short"}">הכי שווים</button><button data-routemode="${ctx}|full" aria-pressed="${mode !== "short"}">כל המקומות</button></div>` : ""}
+    <div class="row daysbar"><span class="sub">${plan.byArea ? (plan.hotel ? `כל יום מתחיל ונגמר ב־${esc(plan.hotel.name)}` : "כל יום באזור אחד") : "אין מספיק מיקומים לחלוקה לפי אזורים"}</span>
       <span class="stepper"><button class="small" data-days="${ctx}|-1" aria-label="פחות ימים">−</button><span>${count} ימים</span><button class="small" data-days="${ctx}|1" aria-label="יותר ימים">+</button></span></div>
+    ${best ? `<p class="bestnote">${pinny("wink", "best-pal")}<span>אם יש לכם רק יום אחד, הייתי הולך על <b>יום ${best.day}</b>: ${whyBest.map(esc).join(" ו־")}.</span></p>` : ""}
     ${shareRow(shareText("route", title, places, city, plan))}
-    ${plan.days.map(d => `<div class="day"><div class="dayhead"><span class="daynum"><small>יום</small>${esc(d.day)}</span><span class="daytitle"><b>${d.title ? esc(d.title) : "יום " + esc(d.day)}</b><span class="sub">${d.stops.length} עצירות</span></span>
-      <a class="btn small primary-link" target="_blank" rel="noopener" href="${openRoute(d.stops.map(s => s.p), city)}">ניווט</a></div>
-      <ol class="stops">${d.stops.map(s => `<li><span class="dot cat-${catOf(s.p)}">${catIcon(catOf(s.p))}</span><span class="stop"><b>${esc(s.p.name)}</b><span class="sub">${[s.slot, areaOf(s.p) && areaOf(s.p) !== d.title ? areaOf(s.p) : ""].filter(Boolean).map(esc).join(" · ")}</span></span><span class="snum">${places.indexOf(s.p) + 1}</span></li>`).join("")}</ol></div>`).join("")}
-    ${plan.rest.length ? `<div class="day rest"><h3>עוד מקומות</h3><p class="sub" style="margin:0">לא מצאתי להם מיקום מדויק, ולכן לא שובצו ביום. לחץ עליהם ברשימה כדי לראות אותם במפה.</p>
+    ${plan.days.map(d => `<div class="day ${d.best ? "best" : ""}"><div class="dayhead"><span class="daynum"><small>יום</small>${esc(d.day)}</span><span class="daytitle">${d.best ? `<span class="besttag">⭐ היום הכי שווה</span>` : ""}<b>${esc(d.name || "יום " + d.day)}</b><span class="sub">${[d.title, d.stops.length + " עצירות", d.km != null ? `${d.km < 1 ? "פחות מק״מ" : "כ־" + Math.round(d.km) + " ק״מ"} ${d.transit ? "· מומלץ בתחבורה ציבורית" : "ברגל"}` : ""].filter(Boolean).map(esc).join(" · ")}</span></span>
+      <a class="btn small primary-link" target="_blank" rel="noopener" href="${openRoute(d.stops.map(s => s.p), city, d.transit, plan.hotel)}">ניווט</a></div>
+      <ol class="stops">${d.stops.map(s => `<li><span class="dot cat-${catOf(s.p)}">${catIcon(catOf(s.p))}</span><span class="stop"><b>${esc(s.p.name)}</b><span class="sub">${[s.slot, areaOf(s.p) && !(d.title || "").includes(areaOf(s.p)) ? areaOf(s.p) : ""].filter(Boolean).map(esc).join(" · ")}</span></span><span class="snum">${places.indexOf(s.p) + 1}</span></li>`).join("")}</ol></div>`).join("")}
+    ${plan.rest.length ? `<div class="day rest"><h3>עוד מקומות</h3><p class="sub" style="margin:0">לא מצאתי להם מיקום מדויק, ולכן לא שובצו ביום. לחצו על סמל המפה שלהם ברשימה כדי לראות אותם.</p>
       <ol class="stops">${plan.rest.map(p => `<li><span class="dot cat-${catOf(p)}">${catIcon(catOf(p))}</span><span class="stop"><b>${esc(p.name)}</b></span><span class="snum">${places.indexOf(p) + 1}</span></li>`).join("")}</ol></div>` : ""}
-    <p class="sub">"ניווט ביום הזה" פותח את מפות Google עם כל התחנות של היום, לפי הסדר.</p>`;
+    ${plan.left > 0 ? `<p class="sub">עוד ${plan.left} מקומות לא נכנסו למסלול המקוצר. הם מחכים ברשימה.</p>` : ""}
+    <p class="sub">השעות הן הערכה לפי סוג המקום וזמן ההליכה. "ניווט" פותח את מפות Google עם כל התחנות של היום, לפי הסדר.</p>`;
 }
 
 
@@ -1164,7 +1281,7 @@ const CAT_WORDS = {
   bar:    "bar pub cocktail cocktails wine enoteca vinoteca brewery beer biergarten rooftop speakeasy club בר פאב יין קוקטייל קוקטיילים בירה מבשלה",
   food:   "restaurants מסעדות foodie eats restaurant ristorante trattoria osteria pizzeria pizza pasta sushi ramen izakaya yakiniku udon soba tempura bistro brasserie taverna tavern grill kitchen burger burgers kebab steak steakhouse deli diner noodle noodles dumplings carbonara cacio tacos street food eatery mart מסעדה מסעדת אוכל פיצה פסטה המבורגר סושי ראמן אודון יאקיניקו קציו קרבונרה דוכן ארוחה ארוחת מנה שף טעים טעימות קציצות אכלנו לאכול",
   shop:   "market mercato markt mercado shop store boutique mall outlet bazaar שוק חנות חנויות קניות בוטיק",
-  stay:   "hotel hostel resort villa guesthouse ryokan airbnb bungalow glamping מלון אכסניה וילה לינה צימר",
+  stay:   "hotel hostel resort guesthouse ryokan airbnb bungalow glamping מלון אכסניה וילה לינה צימר",
   nature: "beach park garden gardens waterfall falls lake mountain hill viewpoint view lookout volcano rice terrace terraces forest river cruise boat trek hike island sunset sunrise cliff cave חוף פארק גן מפל אגם הר גבעה תצפית נוף נהר שיט טרק טיול יער אי שקיעה זריחה מערה",
   site:   "church chiesa basilica cathedral duomo castle castello palace palazzo bridge ponte tower torre square piazza plaza fountain fontana forum colosseum colosseo arch temple shrine monument memorial old town quarter keyhole clock wall gate synagogue mosque fortress ruins street steps truth pantheon כנסייה קתדרלה טירה ארמון גשר מגדל כיכר מזרקה שעון רובע קיר שער מקדש בית כנסת מסגד מבצר חורבות רחוב מדרגות העיר העתיקה אנדרטה",
 };
@@ -1348,7 +1465,7 @@ function renderTabs(r){
 }
 
 document.addEventListener("click", e => {
-  const t = e.target.closest("[data-showmap],[data-mymaps],[data-catf],[data-ocr],[data-tab],[data-save],[data-remove],[data-del],[data-folder],[data-pick],[data-days],[data-share],.place,#addAll,[data-video],[data-delvideo],#showAll,#backFolders,#delFolderAsk,#delFolderYes,#delFolderNo,#sheetClose,#sheet");
+  const t = e.target.closest("[data-routemode],[data-showmap],[data-mymaps],[data-catf],[data-ocr],[data-tab],[data-save],[data-remove],[data-del],[data-folder],[data-pick],[data-days],[data-share],.place,#addAll,[data-video],[data-delvideo],#showAll,#backFolders,#delFolderAsk,#delFolderYes,#delFolderNo,#sheetClose,#sheet");
   if (!t) return;
   if (t.id === "sheet") { if (e.target === t) { state.pick = null; renderSheet(); } return; }
   if (t.id === "sheetClose") { state.pick = null; renderSheet(); return; }
@@ -1370,6 +1487,11 @@ document.addEventListener("click", e => {
   if (t.matches("[data-ocr]")) { if (state.res) { delete state.res.ocrFailed; ocrVideo(state.res); } return; }
   if (t.matches("[data-mymaps]")) { exportMyMaps(); return; }
   if (t.matches("[data-share]")) { navigator.share({ text: decodeURIComponent(t.dataset.share) }).catch(() => {}); return; }
+  if (t.matches("[data-routemode]")) {
+    const [ctx, mode] = t.dataset.routemode.split("|");
+    const m = routeModes(); m[routeKey(ctx)] = mode; store.set("ftm_routemode", m); delete state.days[ctx];
+    render(); return;
+  }
   if (t.matches("[data-days]")) {
     const [ctx, step] = t.dataset.days.split("|");
     const list = ctx === "v" ? state.res.places : (state.folders.find(f => "f:" + f.id === ctx)?.places || []);
