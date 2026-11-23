@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>FeedTrip · מהפיד לטיול הבא</title>
+<meta name="description" content="שומרים סרטוני טיול ואוכל מטיקטוק ומאינסטגרם, ו-FeedTrip הופך אותם למקומות על מפה, לתיקייה לכל טיול ולמסלול לפי ימים. חינם ובלי הרשמה.">
+<meta property="og:title" content="FeedTrip · מהפיד לטיול הבא">
+<meta property="og:description" content="סרטוני טיול ואוכל הופכים למפה ולמסלול לפי ימים. חינם ובלי הרשמה.">
+<meta property="og:image" content="https://productstudiors-hue.github.io/feed-to-map/og.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:url" content="https://productstudiors-hue.github.io/feed-to-map/welcome.html"><meta property="og:type" content="website"><meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="icon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#F8F6FF">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600&family=Varela+Round&display=swap">
+<style>
+:root{--paper:#F8F6FF;--surface:#FFFFFF;--ink:#3B3654;--muted:#7E7999;--line:#ECE9F5;--soft:#F1EEFA;--pin:#FF8FA3;--blush:#FFC9D4;--face:#3B3654;--mint:#BDEBDD;--mint-ink:#1F6B55;--sel:#FFF0F3;--lilac:#E6E0FF;--shadow:0 10px 30px rgba(59,54,84,.08);--d:"Varela Round","Rubik",sans-serif}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--paper:#17152A;--surface:#211E38;--ink:#EEEBFA;--muted:#A6A1C0;--line:#2F2B4A;--soft:#2A2645;--pin:#FF9DB0;--blush:#FF7E98;--face:#2A2140;--sel:#33263F;--mint:#244A40;--mint-ink:#A7E9D6;--lilac:#2E2850;--shadow:0 10px 30px rgba(0,0,0,.35)}}
+:root[data-theme="dark"]{--paper:#17152A;--surface:#211E38;--ink:#EEEBFA;--muted:#A6A1C0;--line:#2F2B4A;--soft:#2A2645;--pin:#FF9DB0;--blush:#FF7E98;--face:#2A2140;--sel:#33263F;--mint:#244A40;--mint-ink:#A7E9D6;--lilac:#2E2850}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.6 Rubik,system-ui,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:0 16px}
+h1,h2,h3{font-family:var(--d);font-weight:400;margin:0;letter-spacing:-.01em}
+p{margin:0}
+.sub{color:var(--muted)}
+a{color:inherit}
+.top{display:flex;align-items:center;justify-content:space-between;padding:18px 0}
+.logo{display:flex;align-items:center;gap:8px;font-family:var(--d);font-size:22px;direction:ltr}
+.logo .pal{width:24px;height:30px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:0 22px;border-radius:99px;font:500 16px Rubik,sans-serif;text-decoration:none;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;white-space:nowrap}
+.btn.main{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.btn.wa{background:#25D366;border-color:#25D366;color:#0B3B1E}
+.btn.small{min-height:40px;padding:0 16px;font-size:14px}
+.btn svg{width:20px;height:20px}
+/* hero */
+.hero{display:grid;grid-template-columns:1.1fr .9fr;gap:40px;align-items:center;padding:28px 0 56px}
+.kicker{display:inline-flex;align-items:center;gap:6px;background:var(--sel);color:var(--ink);border-radius:99px;padding:4px 12px;font-size:14px;margin-bottom:16px}
+.hero h1{font-size:clamp(36px,6.4vw,60px);line-height:1.1}
+.hero h1 em{font-style:normal;background:linear-gradient(transparent 62%,var(--blush) 62%);padding:0 4px}
+.hero .lead{font-size:19px;color:var(--muted);margin:18px 0 26px;max-width:30em}
+.ctas{display:flex;gap:10px;flex-wrap:wrap}
+.note{font-size:13.5px;color:var(--muted);margin-top:14px}
+/* phone */
+.phone{justify-self:center;width:min(300px,82vw);aspect-ratio:9/18.5;background:var(--paper);border:10px solid var(--ink);border-radius:44px;box-shadow:0 30px 60px rgba(59,54,84,.22);overflow:hidden;position:relative;display:flex;flex-direction:column}
+.phone .bar{display:flex;align-items:center;justify-content:space-between;padding:16px 16px 6px;font-family:var(--d);direction:ltr;font-size:15px}
+.phone .bar .pal{width:15px;height:19px}
+.phone .plus{width:26px;height:26px;border-radius:50%;background:var(--ink);color:var(--paper);display:grid;place-items:center;font-size:16px}
+.mmap{margin:8px 12px;height:30%;border-radius:18px;background:
+  radial-gradient(circle at 70% 30%,var(--mint) 0 18%,transparent 19%),
+  radial-gradient(circle at 25% 75%,var(--lilac) 0 22%,transparent 23%),
+  linear-gradient(115deg,transparent 46%,var(--surface) 46% 50%,transparent 50%),
+  linear-gradient(20deg,transparent 60%,var(--surface) 60% 63%,transparent 63%),var(--soft);position:relative}
+.mmap i{position:absolute;width:16px;height:20px}
+.mmap i svg{width:100%;height:100%}
+.mtitle{padding:6px 16px 2px;font-family:var(--d);font-size:18px}
+.mtags{display:flex;gap:6px;padding:0 16px 8px;font-size:11px}
+.mtags span{background:var(--sel);border-radius:99px;padding:2px 8px}
+.mlist{list-style:none;margin:0;padding:0 12px;display:flex;flex-direction:column;gap:8px}
+.mlist li{display:flex;align-items:center;gap:10px;background:var(--surface);border-radius:14px;padding:8px;box-shadow:var(--shadow)}
+.ph{width:40px;height:40px;border-radius:11px;flex:0 0 auto}
+.mlist b{font-weight:500;font-size:13px;display:block;line-height:1.25}
+.mlist small{font-size:11px;color:var(--muted)}
+.num{margin-inline-start:auto;width:22px;height:22px;border-radius:50%;background:var(--pin);color:#fff;font-size:11px;display:grid;place-items:center;flex:0 0 auto}
+.float{position:absolute;inset-inline-start:-6px;bottom:18%;}
+/* sections */
+section.block{padding:56px 0;border-top:1px solid var(--line)}
+.block h2{font-size:clamp(28px,4.4vw,38px);margin-bottom:8px}
+.block>.wrap>.sub{font-size:17px;margin-bottom:28px;max-width:36em}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;list-style:none;margin:0;padding:0;counter-reset:s}
+.steps li{background:var(--surface);border-radius:24px;padding:22px;box-shadow:var(--shadow);counter-increment:s}
+.steps li::before{content:counter(s);display:grid;place-items:center;width:36px;height:36px;border-radius:50%;background:var(--pin);color:#fff;font-family:var(--d);font-size:18px;margin-bottom:12px}
+.steps b{display:block;font-weight:600;margin-bottom:4px}
+.feats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.feat{background:var(--surface);border-radius:24px;padding:22px;box-shadow:var(--shadow)}
+.feat .ic{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;margin-bottom:12px;background:var(--sel);color:var(--ink)}
+.feat:nth-child(3n+2) .ic{background:var(--mint);color:var(--mint-ink)}
+.feat:nth-child(3n) .ic{background:var(--lilac)}
+.feat .ic svg{width:22px;height:22px}
+.feat h3{font-size:19px;margin-bottom:4px}
+.feat p{color:var(--muted);font-size:15px}
+/* install */
+.install{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.os{background:var(--surface);border-radius:24px;padding:24px;box-shadow:var(--shadow)}
+.os h3{font-size:21px;display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.os ol{margin:0;padding-inline-start:20px;display:flex;flex-direction:column;gap:8px}
+.os .tip{margin-top:14px;background:var(--soft);border-radius:14px;padding:12px 14px;font-size:14.5px}
+kbd{font:inherit;background:var(--soft);border:1px solid var(--line);border-radius:7px;padding:0 6px;white-space:nowrap}
+/* share */
+.sharebox{display:grid;grid-template-columns:auto 1fr;gap:28px;align-items:center;background:var(--surface);border-radius:32px;padding:28px;box-shadow:var(--shadow)}
+.qr{width:180px;height:180px;padding:12px;background:#fff;border-radius:22px;border:1.5px solid var(--line)}
+.qr svg{width:100%;height:100%;display:block}
+.msg{background:var(--soft);border-radius:16px;padding:14px 16px;font-size:15px;white-space:pre-line;margin:14px 0}
+.fine{padding:32px 0 48px;color:var(--muted);font-size:14px;text-align:center;display:flex;flex-direction:column;gap:6px;align-items:center}
+.fine .pal{width:30px;height:38px}
+@media (max-width:760px){
+  .hero{grid-template-columns:1fr;gap:34px;padding-top:12px;text-align:center}
+  .hero .lead{margin-inline:auto} .ctas{justify-content:center} .kicker{margin-inline:auto}
+  .steps,.feats,.install{grid-template-columns:1fr}
+  .sharebox{grid-template-columns:1fr;justify-items:center;text-align:center;padding:22px 16px}
+  .ctas .btn{flex:1 1 220px}
+}
+@media (prefers-reduced-motion:no-preference){.bob{animation:bob 3.4s ease-in-out infinite}@keyframes bob{50%{transform:translateY(-6px)}}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top"><span class="logo"><svg class="pal " viewBox="0 0 64 80" aria-hidden="true"><path d="M32 4C18 4 7 15 7 29c0 19 25 45 25 45s25-26 25-45C57 15 46 4 32 4z" fill="var(--pin)"/><ellipse cx="18.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><ellipse cx="45.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><circle cx="24" cy="28" r="3.4" fill="var(--face)"/><circle cx="40" cy="28" r="3.4" fill="var(--face)"/><circle cx="25.3" cy="26.8" r="1.1" fill="#fff"/><circle cx="41.3" cy="26.8" r="1.1" fill="#fff"/><path d="M26.5 36.5q5.5 4.6 11 0" stroke="var(--face)" stroke-width="2.6" fill="none" stroke-linecap="round"/></svg>FeedTrip</span><a class="btn small" href="./">פתיחה</a></header>
+
+  <section class="hero">
+    <div>
+      <span class="kicker">היי, אני פיני 👋 ואני אסדר לכם את הטיול</span>
+      <h1>כל הסרטונים ששמרתם,<br><em>מסלול אחד</em> לטיול הבא</h1>
+      <p class="lead">משתפים סרטון טיול או אוכל מטיקטוק או מאינסטגרם, ו-FeedTrip מוצא את המקומות, שם אותם על מפה ובונה מסלול לפי ימים.</p>
+      <div class="ctas">
+        <a class="btn main" href="./">פתחו את FeedTrip</a>
+        <a class="btn wa" href="https://wa.me/?text=%D7%92%D7%99%D7%9C%D7%99%D7%AA%D7%99%20%D7%90%D7%AA%20FeedTrip%20%F0%9F%93%8D%0A%D7%A9%D7%95%D7%9E%D7%A8%D7%99%D7%9D%20%D7%A1%D7%A8%D7%98%D7%95%D7%A0%D7%99%20%D7%98%D7%99%D7%95%D7%9C%20%D7%95%D7%90%D7%95%D7%9B%D7%9C%20%D7%9E%D7%98%D7%99%D7%A7%D7%98%D7%95%D7%A7%20%D7%95%D7%9E%D7%90%D7%99%D7%A0%D7%A1%D7%98%D7%92%D7%A8%D7%9D%2C%20%D7%95%D7%94%D7%95%D7%90%20%D7%94%D7%95%D7%A4%D7%9A%20%D7%90%D7%95%D7%AA%D7%9D%20%D7%9C%D7%9E%D7%A7%D7%95%D7%9E%D7%95%D7%AA%20%D7%A2%D7%9C%20%D7%9E%D7%A4%D7%94%20%D7%95%D7%9C%D7%9E%D7%A1%D7%9C%D7%95%D7%9C%20%D7%9C%D7%A4%D7%99%20%D7%99%D7%9E%D7%99%D7%9D.%0A%D7%97%D7%99%D7%A0%D7%9D%20%D7%95%D7%91%D7%9C%D7%99%20%D7%94%D7%A8%D7%A9%D7%9E%D7%94%20%F0%9F%91%87%0Ahttps%3A//productstudiors-hue.github.io/feed-to-map/welcome.html" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.3-.4.7-1.4.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.8 11.8 0 0 0 4.5 4c1.7.7 2.3.8 3.2.6a2.7 2.7 0 0 0 1.8-1.2 2.2 2.2 0 0 0 .1-1.3c0-.1-.2-.2-.4-.3Z"/></svg>שתפו עם חברים</a>
+      </div>
+      <p class="note">חינם, בלי הרשמה ובלי להוריד מחנות. עובד בטלפון ובמחשב.</p>
+    </div>
+    <div class="phone" aria-label="דוגמה למסך באפליקציה">
+      <div class="bar"><span class="plus">+</span><span style="display:flex;gap:5px;align-items:center">FeedTrip <svg class="pal " viewBox="0 0 64 80" aria-hidden="true"><path d="M32 4C18 4 7 15 7 29c0 19 25 45 25 45s25-26 25-45C57 15 46 4 32 4z" fill="var(--pin)"/><ellipse cx="18.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><ellipse cx="45.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><circle cx="24" cy="28" r="3.4" fill="var(--face)"/><circle cx="40" cy="28" r="3.4" fill="var(--face)"/><circle cx="25.3" cy="26.8" r="1.1" fill="#fff"/><circle cx="41.3" cy="26.8" r="1.1" fill="#fff"/><path d="M26.5 36.5q5.5 4.6 11 0" stroke="var(--face)" stroke-width="2.6" fill="none" stroke-linecap="round"/></svg></span></div>
+      <div class="mmap">
+        <i style="top:22%;right:24%"><svg class="pal " viewBox="0 0 64 80" aria-hidden="true"><path d="M32 4C18 4 7 15 7 29c0 19 25 45 25 45s25-26 25-45C57 15 46 4 32 4z" fill="var(--pin)"/><ellipse cx="18.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><ellipse cx="45.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><circle cx="24" cy="28" r="3.4" fill="var(--face)"/><circle cx="40" cy="28" r="3.4" fill="var(--face)"/><circle cx="25.3" cy="26.8" r="1.1" fill="#fff"/><circle cx="41.3" cy="26.8" r="1.1" fill="#fff"/><path d="M26.5 36.5q5.5 4.6 11 0" stroke="var(--face)" stroke-width="2.6" fill="none" stroke-linecap="round"/></svg></i><i style="top:48%;right:55%"><svg class="pal " viewBox="0 0 64 80" aria-hidden="true"><path d="M32 4C18 4 7 15 7 29c0 19 25 45 25 45s25-26 25-45C57 15 46 4 32 4z" fill="var(--pin)"/><ellipse cx="18.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><ellipse cx="45.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><circle cx="24" cy="28" r="3.4" fill="var(--face)"/><circle cx="40" cy="28" r="3.4" fill="var(--face)"/><circle cx="25.3" cy="26.8" r="1.1" fill="#fff"/><circle cx="41.3" cy="26.8" r="1.1" fill="#fff"/><path d="M26.5 36.5q5.5 4.6 11 0" stroke="var(--face)" stroke-width="2.6" fill="none" stroke-linecap="round"/></svg></i><i style="top:64%;right:30%"><svg class="pal " viewBox="0 0 64 80" aria-hidden="true"><path d="M32 4C18 4 7 15 7 29c0 19 25 45 25 45s25-26 25-45C57 15 46 4 32 4z" fill="var(--pin)"/><ellipse cx="18.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><ellipse cx="45.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><circle cx="24" cy="28" r="3.4" fill="var(--face)"/><circle cx="40" cy="28" r="3.4" fill="var(--face)"/><circle cx="25.3" cy="26.8" r="1.1" fill="#fff"/><circle cx="41.3" cy="26.8" r="1.1" fill="#fff"/><path d="M26.5 36.5q5.5 4.6 11 0" stroke="var(--face)" stroke-width="2.6" fill="none" stroke-linecap="round"/></svg></i><i style="top:30%;right:72%"><svg class="pal " viewBox="0 0 64 80" aria-hidden="true"><path d="M32 4C18 4 7 15 7 29c0 19 25 45 25 45s25-26 25-45C57 15 46 4 32 4z" fill="var(--pin)"/><ellipse cx="18.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><ellipse cx="45.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><circle cx="24" cy="28" r="3.4" fill="var(--face)"/><circle cx="40" cy="28" r="3.4" fill="var(--face)"/><circle cx="25.3" cy="26.8" r="1.1" fill="#fff"/><circle cx="41.3" cy="26.8" r="1.1" fill="#fff"/><path d="M26.5 36.5q5.5 4.6 11 0" stroke="var(--face)" stroke-width="2.6" fill="none" stroke-linecap="round"/></svg></i>
+      </div>
+      <p class="mtitle">3 ימים ברומא</p>
+      <div class="mtags"><span>🇮🇹 רומא</span><span>8 מקומות</span><span>מ־3 סרטונים</span></div>
+      <ul class="mlist">
+        <li><span class="ph" style="background:linear-gradient(135deg,#FFD3B6,#FF8FA3)"></span><span><b>Roscioli</b><small>אוכל · קרבונרה מפורסמת</small></span><span class="num">1</span></li>
+        <li><span class="ph" style="background:linear-gradient(135deg,#E6E0FF,#A99BF2)"></span><span><b>Pantheon</b><small>אתר · להגיע לפני 10:00</small></span><span class="num">2</span></li>
+        <li><span class="ph" style="background:linear-gradient(135deg,#BDEBDD,#6CC5A6)"></span><span><b>Gelateria del Teatro</b><small>קינוח · 300 מ׳ הליכה</small></span><span class="num">3</span></li>
+      </ul>
+    </div>
+  </section>
+</div>
+
+<section class="block"><div class="wrap">
+  <h2>איך זה עובד</h2>
+  <p class="sub">שלושה צעדים, ופיני עושה את השאר.</p>
+  <ol class="steps">
+    <li><b>שומרים סרטון</b><span class="sub">בטיקטוק או באינסטגרם לוחצים על <kbd>שיתוף</kbd> ובוחרים ב-FeedTrip, או מעתיקים את הקישור ומדביקים.</span></li>
+    <li><b>פיני קורא את הסרטון</b><span class="sub">גם את התיאור וגם את הטקסט שעל הסרטון עצמו, ומוצא כל מקום על המפה.</span></li>
+    <li><b>יוצאים לטיול</b><span class="sub">רשימה, מפה ומסלול לפי ימים, עם ניווט ב-Google Maps ושיתוף בוואטסאפ.</span></li>
+  </ol>
+</div></section>
+
+<section class="block"><div class="wrap">
+  <h2>מה יש בפנים</h2>
+  <p class="sub">כל מה שצריך כדי שהסרטונים ששמרתם באמת ייכנסו לטיול.</p>
+  <div class="feats">
+    <div class="feat"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4 3 6.5v13.5L9 17.5l6 2.5 6-2.5V4l-6 2.5L9 4Z"/><path d="M9 4v13.5M15 6.5V20"/></svg></span><h3>מפה לפי אזורים</h3><p>כל המקומות מהסרטון מסומנים על המפה, עם תמונה, אזור והסבר קצר.</p></div><div class="feat"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></svg></span><h3>תיקייה לכל טיול</h3><p>אוספים סרטונים לתיקייה של מדינה או עיר, והכול מתחבר לרשימה אחת.</p></div><div class="feat"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="18" r="2.2"/><circle cx="18" cy="6" r="2.2"/><path d="M8 18h7a3.5 3.5 0 0 0 0-7H9a3.5 3.5 0 0 1 0-7h7"/></svg></span><h3>מסלול לפי ימים</h3><p>יום לכל אזור, סדר הגיוני, מרחקי הליכה ושעות עומס. בוחרים: הכול, או רק הכי שווים.</p></div><div class="feat"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4V5Z"/><path d="M8 9.5h8M8 12.5h5"/></svg></span><h3>מסלול מצ'ט</h3><p>בנו מסלול ב-ChatGPT או Claude, הדביקו, ו-FeedTrip ישלב בו את המקומות מהסרטונים.</p></div><div class="feat"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3v8a2 2 0 0 0 2 2v8M11 3v8a2 2 0 0 1-2 2M17 3c-2 2-2.5 5-2.5 8h2.5v10"/></svg></span><h3>אוכל, אתרים או משולב</h3><p>מסלול קולינרי, מסלול אתרים, או שילוב של שניהם.</p></div><div class="feat"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="m8.2 10.8 7.6-4.4M8.2 13.2l7.6 4.4"/></svg></span><h3>שולחים לחברים</h3><p>רשימה או מסלול לוואטסאפ, וניווט ישר ב-Google Maps.</p></div>
+  </div>
+</div></section>
+
+<section class="block" id="install"><div class="wrap">
+  <h2>מתקינים בחצי דקה</h2>
+  <p class="sub">FeedTrip היא אפליקציית רשת. פותחים את הקישור בטלפון ומוסיפים למסך הבית, והיא מתנהגת כמו כל אפליקציה.</p>
+  <div class="install">
+    <div class="os"><h3>🤖 אנדרואיד</h3>
+      <ol><li>פותחים את <a href="./">הקישור</a> ב-Chrome.</li><li>לוחצים על <kbd>⋮</kbd> ואז <kbd>התקנת אפליקציה</kbd> או <kbd>הוספה למסך הבית</kbd>.</li><li>מעכשיו FeedTrip מופיע בתפריט השיתוף של טיקטוק ואינסטגרם.</li></ol>
+      <p class="tip">💡 בטיקטוק: <kbd>שיתוף</kbd> ← <kbd>עוד</kbd> ← FeedTrip.</p></div>
+    <div class="os"><h3>📱 אייפון</h3>
+      <ol><li>פותחים את <a href="./">הקישור</a> ב-Safari.</li><li>לוחצים על <kbd>שיתוף ⬆︎</kbd> ואז <kbd>הוספה למסך הבית</kbd>.</li><li>פותחים את FeedTrip מהאייקון של פיני.</li></ol>
+      <p class="tip">💡 באייפון אי אפשר לשתף ישר ל-FeedTrip. בטיקטוק לוחצים <kbd>שיתוף</kbd> ← <kbd>העתקת קישור</kbd>, ובאפליקציה על <kbd>+</kbd> ← <kbd>הדבק</kbd>.</p></div>
+  </div>
+</div></section>
+
+<section class="block"><div class="wrap">
+  <div class="sharebox">
+    <div class="qr" role="img" aria-label="קוד QR לפתיחת FeedTrip"><svg version="1.1" viewBox="0 0 35 35" xmlns="http://www.w3.org/2000/svg"><path fill="#3B3654" d="M1,1H2V2H1zM2,1H3V2H2zM3,1H4V2H3zM4,1H5V2H4zM5,1H6V2H5zM6,1H7V2H6zM7,1H8V2H7zM12,1H13V2H12zM17,1H18V2H17zM20,1H21V2H20zM21,1H22V2H21zM24,1H25V2H24zM27,1H28V2H27zM28,1H29V2H28zM29,1H30V2H29zM30,1H31V2H30zM31,1H32V2H31zM32,1H33V2H32zM33,1H34V2H33zM1,2H2V3H1zM7,2H8V3H7zM11,2H12V3H11zM12,2H13V3H12zM16,2H17V3H16zM17,2H18V3H17zM18,2H19V3H18zM19,2H20V3H19zM21,2H22V3H21zM23,2H24V3H23zM27,2H28V3H27zM33,2H34V3H33zM1,3H2V4H1zM3,3H4V4H3zM4,3H5V4H4zM5,3H6V4H5zM7,3H8V4H7zM9,3H10V4H9zM11,3H12V4H11zM13,3H14V4H13zM15,3H16V4H15zM17,3H18V4H17zM19,3H20V4H19zM20,3H21V4H20zM21,3H22V4H21zM22,3H23V4H22zM23,3H24V4H23zM27,3H28V4H27zM29,3H30V4H29zM30,3H31V4H30zM31,3H32V4H31zM33,3H34V4H33zM1,4H2V5H1zM3,4H4V5H3zM4,4H5V5H4zM5,4H6V5H5zM7,4H8V5H7zM9,4H10V5H9zM10,4H11V5H10zM11,4H12V5H11zM12,4H13V5H12zM13,4H14V5H13zM16,4H17V5H16zM18,4H19V5H18zM20,4H21V5H20zM21,4H22V5H21zM25,4H26V5H25zM27,4H28V5H27zM29,4H30V5H29zM30,4H31V5H30zM31,4H32V5H31zM33,4H34V5H33zM1,5H2V6H1zM3,5H4V6H3zM4,5H5V6H4zM5,5H6V6H5zM7,5H8V6H7zM9,5H10V6H9zM10,5H11V6H10zM12,5H13V6H12zM14,5H15V6H14zM15,5H16V6H15zM16,5H17V6H16zM17,5H18V6H17zM19,5H20V6H19zM20,5H21V6H20zM21,5H22V6H21zM22,5H23V6H22zM24,5H25V6H24zM27,5H28V6H27zM29,5H30V6H29zM30,5H31V6H30zM31,5H32V6H31zM33,5H34V6H33zM1,6H2V7H1zM7,6H8V7H7zM9,6H10V7H9zM10,6H11V7H10zM13,6H14V7H13zM18,6H19V7H18zM19,6H20V7H19zM21,6H22V7H21zM25,6H26V7H25zM27,6H28V7H27zM33,6H34V7H33zM1,7H2V8H1zM2,7H3V8H2zM3,7H4V8H3zM4,7H5V8H4zM5,7H6V8H5zM6,7H7V8H6zM7,7H8V8H7zM9,7H10V8H9zM11,7H12V8H11zM13,7H14V8H13zM15,7H16V8H15zM17,7H18V8H17zM19,7H20V8H19zM21,7H22V8H21zM23,7H24V8H23zM25,7H26V8H25zM27,7H28V8H27zM28,7H29V8H28zM29,7H30V8H29zM30,7H31V8H30zM31,7H32V8H31zM32,7H33V8H32zM33,7H34V8H33zM9,8H10V9H9zM10,8H11V9H10zM12,8H13V9H12zM15,8H16V9H15zM17,8H18V9H17zM19,8H20V9H19zM20,8H21V9H20zM22,8H23V9H22zM23,8H24V9H23zM1,9H2V10H1zM3,9H4V10H3zM4,9H5V10H4zM5,9H6V10H5zM6,9H7V10H6zM7,9H8V10H7zM10,9H11V10H10zM13,9H14V10H13zM14,9H15V10H14zM15,9H16V10H15zM18,9H19V10H18zM23,9H24V10H23zM27,9H28V10H27zM28,9H29V10H28zM29,9H30V10H29zM30,9H31V10H30zM31,9H32V10H31zM1,10H2V11H1zM2,10H3V11H2zM4,10H5V11H4zM5,10H6V11H5zM11,10H12V11H11zM12,10H13V11H12zM13,10H14V11H13zM14,10H15V11H14zM15,10H16V11H15zM17,10H18V11H17zM20,10H21V11H20zM21,10H22V11H21zM23,10H24V11H23zM24,10H25V11H24zM27,10H28V11H27zM28,10H29V11H28zM30,10H31V11H30zM31,10H32V11H31zM33,10H34V11H33zM1,11H2V12H1zM3,11H4V12H3zM7,11H8V12H7zM8,11H9V12H8zM14,11H15V12H14zM15,11H16V12H15zM16,11H17V12H16zM18,11H19V12H18zM19,11H20V12H19zM21,11H22V12H21zM22,11H23V12H22zM23,11H24V12H23zM25,11H26V12H25zM26,11H27V12H26zM29,11H30V12H29zM31,11H32V12H31zM32,11H33V12H32zM1,12H2V13H1zM2,12H3V13H2zM5,12H6V13H5zM6,12H7V13H6zM8,12H9V13H8zM9,12H10V13H9zM10,12H11V13H10zM14,12H15V13H14zM17,12H18V13H17zM22,12H23V13H22zM23,12H24V13H23zM27,12H28V13H27zM29,12H30V13H29zM30,12H31V13H30zM31,12H32V13H31zM32,12H33V13H32zM1,13H2V14H1zM2,13H3V14H2zM4,13H5V14H4zM5,13H6V14H5zM7,13H8V14H7zM10,13H11V14H10zM13,13H14V14H13zM15,13H16V14H15zM17,13H18V14H17zM18,13H19V14H18zM19,13H20V14H19zM20,13H21V14H20zM21,13H22V14H21zM23,13H24V14H23zM26,13H27V14H26zM28,13H29V14H28zM29,13H30V14H29zM30,13H31V14H30zM32,13H33V14H32zM2,14H3V15H2zM4,14H5V15H4zM6,14H7V15H6zM8,14H9V15H8zM10,14H11V15H10zM11,14H12V15H11zM16,14H17V15H16zM20,14H21V15H20zM21,14H22V15H21zM22,14H23V15H22zM24,14H25V15H24zM27,14H28V15H27zM31,14H32V15H31zM32,14H33V15H32zM33,14H34V15H33zM2,15H3V16H2zM4,15H5V16H4zM6,15H7V16H6zM7,15H8V16H7zM9,15H10V16H9zM10,15H11V16H10zM11,15H12V16H11zM12,15H13V16H12zM13,15H14V16H13zM16,15H17V16H16zM17,15H18V16H17zM18,15H19V16H18zM19,15H20V16H19zM21,15H22V16H21zM22,15H23V16H22zM23,15H24V16H23zM26,15H27V16H26zM27,15H28V16H27zM29,15H30V16H29zM32,15H33V16H32zM2,16H3V17H2zM3,16H4V17H3zM10,16H11V17H10zM12,16H13V17H12zM14,16H15V17H14zM16,16H17V17H16zM20,16H21V17H20zM21,16H22V17H21zM22,16H23V17H22zM26,16H27V17H26zM27,16H28V17H27zM29,16H30V17H29zM31,16H32V17H31zM1,17H2V18H1zM4,17H5V18H4zM5,17H6V18H5zM6,17H7V18H6zM7,17H8V18H7zM8,17H9V18H8zM10,17H11V18H10zM11,17H12V18H11zM13,17H14V18H13zM14,17H15V18H14zM15,17H16V18H15zM16,17H17V18H16zM18,17H19V18H18zM19,17H20V18H19zM20,17H21V18H20zM23,17H24V18H23zM24,17H25V18H24zM25,17H26V18H25zM26,17H27V18H26zM28,17H29V18H28zM29,17H30V18H29zM33,17H34V18H33zM2,18H3V19H2zM5,18H6V19H5zM6,18H7V19H6zM8,18H9V19H8zM9,18H10V19H9zM12,18H13V19H12zM18,18H19V19H18zM19,18H20V19H19zM20,18H21V19H20zM21,18H22V19H21zM23,18H24V19H23zM24,18H25V19H24zM26,18H27V19H26zM27,18H28V19H27zM28,18H29V19H28zM30,18H31V19H30zM31,18H32V19H31zM32,18H33V19H32zM33,18H34V19H33zM1,19H2V20H1zM3,19H4V20H3zM5,19H6V20H5zM6,19H7V20H6zM7,19H8V20H7zM9,19H10V20H9zM15,19H16V20H15zM16,19H17V20H16zM17,19H18V20H17zM22,19H23V20H22zM23,19H24V20H23zM26,19H27V20H26zM28,19H29V20H28zM29,19H30V20H29zM31,19H32V20H31zM32,19H33V20H32zM1,20H2V21H1zM12,20H13V21H12zM14,20H15V21H14zM16,20H17V21H16zM17,20H18V21H17zM21,20H22V21H21zM22,20H23V21H22zM23,20H24V21H23zM24,20H25V21H24zM26,20H27V21H26zM28,20H29V21H28zM29,20H30V21H29zM30,20H31V21H30zM31,20H32V21H31zM1,21H2V22H1zM2,21H3V22H2zM3,21H4V22H3zM5,21H6V22H5zM6,21H7V22H6zM7,21H8V22H7zM11,21H12V22H11zM12,21H13V22H12zM14,21H15V22H14zM16,21H17V22H16zM18,21H19V22H18zM21,21H22V22H21zM23,21H24V22H23zM24,21H25V22H24zM25,21H26V22H25zM26,21H27V22H26zM28,21H29V22H28zM29,21H30V22H29zM30,21H31V22H30zM33,21H34V22H33zM1,22H2V23H1zM2,22H3V23H2zM5,22H6V23H5zM6,22H7V23H6zM9,22H10V23H9zM11,22H12V23H11zM15,22H16V23H15zM16,22H17V23H16zM17,22H18V23H17zM18,22H19V23H18zM20,22H21V23H20zM22,22H23V23H22zM24,22H25V23H24zM25,22H26V23H25zM27,22H28V23H27zM28,22H29V23H28zM30,22H31V23H30zM33,22H34V23H33zM1,23H2V24H1zM3,23H4V24H3zM4,23H5V24H4zM7,23H8V24H7zM12,23H13V24H12zM15,23H16V24H15zM21,23H22V24H21zM25,23H26V24H25zM29,23H30V24H29zM32,23H33V24H32zM1,24H2V25H1zM4,24H5V25H4zM5,24H6V25H5zM6,24H7V25H6zM9,24H10V25H9zM13,24H14V25H13zM17,24H18V25H17zM20,24H21V25H20zM21,24H22V25H21zM22,24H23V25H22zM23,24H24V25H23zM29,24H30V25H29zM30,24H31V25H30zM31,24H32V25H31zM32,24H33V25H32zM1,25H2V26H1zM4,25H5V26H4zM6,25H7V26H6zM7,25H8V26H7zM8,25H9V26H8zM12,25H13V26H12zM14,25H15V26H14zM18,25H19V26H18zM20,25H21V26H20zM23,25H24V26H23zM25,25H26V26H25zM26,25H27V26H26zM27,25H28V26H27zM28,25H29V26H28zM29,25H30V26H29zM33,25H34V26H33zM9,26H10V27H9zM10,26H11V27H10zM11,26H12V27H11zM13,26H14V27H13zM14,26H15V27H14zM17,26H18V27H17zM19,26H20V27H19zM20,26H21V27H20zM21,26H22V27H21zM22,26H23V27H22zM23,26H24V27H23zM25,26H26V27H25zM29,26H30V27H29zM31,26H32V27H31zM33,26H34V27H33zM1,27H2V28H1zM2,27H3V28H2zM3,27H4V28H3zM4,27H5V28H4zM5,27H6V28H5zM6,27H7V28H6zM7,27H8V28H7zM11,27H12V28H11zM13,27H14V28H13zM14,27H15V28H14zM16,27H17V28H16zM17,27H18V28H17zM19,27H20V28H19zM21,27H22V28H21zM22,27H23V28H22zM24,27H25V28H24zM25,27H26V28H25zM27,27H28V28H27zM29,27H30V28H29zM31,27H32V28H31zM32,27H33V28H32zM1,28H2V29H1zM7,28H8V29H7zM9,28H10V29H9zM10,28H11V29H10zM12,28H13V29H12zM14,28H15V29H14zM16,28H17V29H16zM17,28H18V29H17zM21,28H22V29H21zM22,28H23V29H22zM23,28H24V29H23zM24,28H25V29H24zM25,28H26V29H25zM29,28H30V29H29zM30,28H31V29H30zM31,28H32V29H31zM1,29H2V30H1zM3,29H4V30H3zM4,29H5V30H4zM5,29H6V30H5zM7,29H8V30H7zM9,29H10V30H9zM13,29H14V30H13zM16,29H17V30H16zM18,29H19V30H18zM23,29H24V30H23zM25,29H26V30H25zM26,29H27V30H26zM27,29H28V30H27zM28,29H29V30H28zM29,29H30V30H29zM30,29H31V30H30zM32,29H33V30H32zM1,30H2V31H1zM3,30H4V31H3zM4,30H5V31H4zM5,30H6V31H5zM7,30H8V31H7zM9,30H10V31H9zM11,30H12V31H11zM12,30H13V31H12zM13,30H14V31H13zM14,30H15V31H14zM15,30H16V31H15zM16,30H17V31H16zM18,30H19V31H18zM20,30H21V31H20zM22,30H23V31H22zM23,30H24V31H23zM26,30H27V31H26zM29,30H30V31H29zM32,30H33V31H32zM33,30H34V31H33zM1,31H2V32H1zM3,31H4V32H3zM4,31H5V32H4zM5,31H6V32H5zM7,31H8V32H7zM9,31H10V32H9zM10,31H11V32H10zM11,31H12V32H11zM12,31H13V32H12zM13,31H14V32H13zM15,31H16V32H15zM16,31H17V32H16zM19,31H20V32H19zM22,31H23V32H22zM23,31H24V32H23zM25,31H26V32H25zM26,31H27V32H26zM27,31H28V32H27zM28,31H29V32H28zM30,31H31V32H30zM31,31H32V32H31zM1,32H2V33H1zM7,32H8V33H7zM10,32H11V33H10zM11,32H12V33H11zM13,32H14V33H13zM19,32H20V33H19zM22,32H23V33H22zM26,32H27V33H26zM29,32H30V33H29zM30,32H31V33H30zM31,32H32V33H31zM1,33H2V34H1zM2,33H3V34H2zM3,33H4V34H3zM4,33H5V34H4zM5,33H6V34H5zM6,33H7V34H6zM7,33H8V34H7zM9,33H10V34H9zM10,33H11V34H10zM12,33H13V34H12zM16,33H17V34H16zM17,33H18V34H17zM18,33H19V34H18zM21,33H22V34H21zM23,33H24V34H23zM24,33H25V34H24zM25,33H26V34H25zM26,33H27V34H26zM28,33H29V34H28zM32,33H33V34H32z" id="qr-path" fill="#000000" fill-opacity="1" fill-rule="nonzero" stroke="none"/></svg></div>
+    <div>
+      <h2>מעבירים הלאה</h2>
+      <p class="sub">סורקים את הקוד בטלפון, או שולחים לחברים את ההודעה:</p>
+      <p class="msg" id="msg" dir="auto">גיליתי את FeedTrip 📍
+שומרים סרטוני טיול ואוכל מטיקטוק ומאינסטגרם, והוא הופך אותם למקומות על מפה ולמסלול לפי ימים.
+חינם ובלי הרשמה 👇
+https://productstudiors-hue.github.io/feed-to-map/welcome.html</p>
+      <div class="ctas"><a class="btn wa" href="https://wa.me/?text=%D7%92%D7%99%D7%9C%D7%99%D7%AA%D7%99%20%D7%90%D7%AA%20FeedTrip%20%F0%9F%93%8D%0A%D7%A9%D7%95%D7%9E%D7%A8%D7%99%D7%9D%20%D7%A1%D7%A8%D7%98%D7%95%D7%A0%D7%99%20%D7%98%D7%99%D7%95%D7%9C%20%D7%95%D7%90%D7%95%D7%9B%D7%9C%20%D7%9E%D7%98%D7%99%D7%A7%D7%98%D7%95%D7%A7%20%D7%95%D7%9E%D7%90%D7%99%D7%A0%D7%A1%D7%98%D7%92%D7%A8%D7%9D%2C%20%D7%95%D7%94%D7%95%D7%90%20%D7%94%D7%95%D7%A4%D7%9A%20%D7%90%D7%95%D7%AA%D7%9D%20%D7%9C%D7%9E%D7%A7%D7%95%D7%9E%D7%95%D7%AA%20%D7%A2%D7%9C%20%D7%9E%D7%A4%D7%94%20%D7%95%D7%9C%D7%9E%D7%A1%D7%9C%D7%95%D7%9C%20%D7%9C%D7%A4%D7%99%20%D7%99%D7%9E%D7%99%D7%9D.%0A%D7%97%D7%99%D7%A0%D7%9D%20%D7%95%D7%91%D7%9C%D7%99%20%D7%94%D7%A8%D7%A9%D7%9E%D7%94%20%F0%9F%91%87%0Ahttps%3A//productstudiors-hue.github.io/feed-to-map/welcome.html" target="_blank" rel="noopener">שליחה בוואטסאפ</a><button class="btn" id="copy" type="button">העתקת ההודעה</button></div>
+    </div>
+  </div>
+</div></section>
+
+<footer class="wrap fine"><svg class="pal bob" viewBox="0 0 64 80" aria-hidden="true"><path d="M32 4C18 4 7 15 7 29c0 19 25 45 25 45s25-26 25-45C57 15 46 4 32 4z" fill="var(--pin)"/><ellipse cx="18.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><ellipse cx="45.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><circle cx="24" cy="28" r="3.4" fill="var(--face)"/><circle cx="25.3" cy="26.8" r="1.1" fill="#fff"/><path d="M36.5 28.5q3.5-2.6 7 0" stroke="var(--face)" stroke-width="2.4" fill="none" stroke-linecap="round"/><path d="M26.5 36.5q5.5 4.6 11 0" stroke="var(--face)" stroke-width="2.6" fill="none" stroke-linecap="round"/></svg>
+  <p>FeedTrip בגרסת ניסיון. הסרטונים והמקומות שלכם נשמרים רק אצלכם בטלפון, בלי חשבון ובלי שרת שזוכר אתכם.</p>
+  <p>מפות: OpenStreetMap · תמונות: ויקיפדיה וויקישיתוף</p>
+</footer>
+<script>
+document.getElementById("copy").addEventListener("click", async e => {
+  const b = e.currentTarget, t = document.getElementById("msg").textContent;
+  try { await navigator.clipboard.writeText(t); b.textContent = "הועתק ✓"; }
+  catch { const r = document.createRange(); r.selectNodeContents(document.getElementById("msg")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); b.textContent = "סמנו והעתיקו"; }
+  setTimeout(() => b.textContent = "העתקת ההודעה", 2200);
+});
+</script>
+</body>
+</html>
