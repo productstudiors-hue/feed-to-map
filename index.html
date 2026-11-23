@@ -426,7 +426,7 @@ body.busy .hello,body.busy #status,body.busy #geoNote,body.busy #homeChat{displa
 <body>
 <main class="app">
   <header class="brand"><div class="logo"><svg class="pal" viewBox="0 0 64 80" aria-hidden="true"><path d="M32 4C18 4 7 15 7 29c0 19 25 45 25 45s25-26 25-45C57 15 46 4 32 4z" fill="var(--pin)"/><ellipse cx="18.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><ellipse cx="45.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><circle cx="24" cy="28" r="3.4" fill="var(--face)"/><circle cx="40" cy="28" r="3.4" fill="var(--face)"/><circle cx="25.3" cy="26.8" r="1.1" fill="#fff"/><circle cx="41.3" cy="26.8" r="1.1" fill="#fff"/><path d="M26.5 36.5q5.5 4.6 11 0" stroke="var(--face)" stroke-width="2.6" fill="none" stroke-linecap="round"/></svg><h1 dir="ltr">FeedTrip</h1></div>
-    <div class="hdr"><span class="count" id="ver">v1.32</span><button class="toolbtn" id="toolSearch" type="button" aria-label="חיפוש המלצות בטיקטוק ובאינסטגרם"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg><span class="badge" hidden></span></button><button class="toolbtn" id="toolChat" type="button" aria-label="מסלול מצ'ט"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4V5Z"/><path d="M8 9.5h8M8 12.5h5"/></svg></button><button class="addbtn" id="addBtn" type="button" aria-expanded="false" aria-controls="addBox" aria-label="הוספת קישור לסרטון"><span aria-hidden="true">+</span></button></div></header>
+    <div class="hdr"><span class="count" id="ver">v1.33</span><button class="toolbtn" id="toolSearch" type="button" aria-label="חיפוש המלצות בטיקטוק ובאינסטגרם"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg><span class="badge" hidden></span></button><button class="toolbtn" id="toolChat" type="button" aria-label="מסלול מצ'ט"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4V5Z"/><path d="M8 9.5h8M8 12.5h5"/></svg></button><button class="addbtn" id="addBtn" type="button" aria-expanded="false" aria-controls="addBox" aria-label="הוספת קישור לסרטון"><span aria-hidden="true">+</span></button></div></header>
 
 
   <div class="addbox" id="addBox" hidden>
@@ -1679,15 +1679,14 @@ function renderFeedBar(){
 const COLLECT_TOPICS = [["אוכל", "food"], ["אוכל רחוב", "street food"], ["אתרים", "things to do"], ["בתי קפה", "cafes"], ["פנינים נסתרות", "hidden gems"], ["חיי לילה", "nightlife"]];
 const getCollect = () => { const c = store.get("ftm_collect", null); return c && Date.now() - c.at < 3 * 864e5 && state.folders.some(f => f.id === c.id) ? c : null; };
 const setCollect = c => c ? store.set("ftm_collect", c) : (() => { try { localStorage.removeItem("ftm_collect"); } catch {} })();
-const tiktokSearch = q => `https://www.tiktok.com/search?q=${encodeURIComponent(q)}`;
-const instaSearch = q => `https://www.instagram.com/explore/search/keyword/?q=${encodeURIComponent(q)}`;
 function startCollect(q){
   q = q.trim().replace(/\s+/g, " "); if (q.length < 2) return;
   const city = cityFromText(q);
   const name = city ? (HE_CITY[city] || city) : q.slice(0, 30);
   let f = state.folders.find(x => x.name === name);
+  const created = !f;
   if (!f) { f = { id: "f" + Date.now().toString(36), name, places: [] }; state.folders.push(f); saveFolders(); }
-  setCollect({ id: f.id, q, city, videos: [], at: Date.now() });
+  setCollect({ id: f.id, q, city, videos: [], at: Date.now(), created });
   state.tool = "search"; renderSheet(); renderHomeSearch();
 }
 // Every video scanned while collecting joins the trip's folder (and keeps joining as more of its places are found).
@@ -1720,8 +1719,6 @@ function searchSheetHTML(){
     return `<h3 id="toolT">אוספים המלצות: ${esc(c.q)}</h3>
       <p class="sub" style="margin:0">${n ? `${n} ${n === 1 ? "סרטון" : "סרטונים"} · ${f.places.length} מקומות בטיול "${esc(f.name)}".` : `כל סרטון שתשתפו ל-FeedTrip ייכנס לטיול "${esc(f.name)}".`}</p>
       <div class="dots" aria-label="${n} מתוך 5">${[0,1,2,3,4].map(i => `<span class="pd${i < n ? " on" : i < 2 ? " need" : ""}"></span>`).join("")}</div>
-      <div class="row"><a class="btn tt" target="_blank" rel="noopener" href="${tiktokSearch(c.q)}">חיפוש בטיקטוק</a><a class="btn ig" target="_blank" rel="noopener" href="${instaSearch(c.q)}">חיפוש באינסטגרם</a></div>
-      <p class="sub tiny">בסרטון שאהבתם: שיתוף ← FeedTrip. באייפון: העתקת קישור, וחוזרים לכאן ל-+ ← הדבק.</p>
       <div class="row">${n ? `<button class="primary-link" type="button" id="collectDone">${n < 2 ? "לבנות כבר עכשיו" : "בניית המסלול"}</button>` : ""}<button class="small ghost" type="button" id="collectStop">${n ? "סיום בלי מסלול" : "ביטול החיפוש"}</button><button class="small" id="sheetClose" type="button">סגירה</button></div>`;
   }
   return `<form id="searchForm" class="toolform"><h3 id="toolT">מחפשים המלצות?</h3>
@@ -1761,9 +1758,12 @@ async function autoSearch(q){
   } catch { j = { error: "offline" }; }
   document.body.classList.remove("busy"); $("#bar").hidden = true;
   if (!j.results?.length) {
-    state.tool = "search"; renderSheet();
-    setStatus(j.error === "needs_apify" ? "החיפוש האוטומטי עוד לא מחובר (חסר מפתח Apify בשרת). בינתיים: חפשו בכפתורים, ושתפו לכאן את הסרטונים שאהבתם."
-      : j.error === "offline" ? "אין חיבור לשרת. אפשר לחפש בכפתורים ולשתף סרטונים לכאן." : "לא מצאתי סרטונים לחיפוש הזה. נסו מילים אחרות, או באנגלית.", true);
+    // nothing to scan: undo the empty trip that was opened for this search
+    const c = getCollect(); setCollect(null);
+    if (c?.created) { const f = state.folders.find(x => x.id === c.id); if (f && !f.places.length) { state.folders = state.folders.filter(x => x !== f); saveFolders(); } }
+    render();
+    setStatus(j.error === "needs_apify" ? "החיפוש האוטומטי עוד לא מחובר: חסר מפתח Apify בשרת. ברגע שיתווסף, החיפוש יעבוד מכאן."
+      : j.error === "offline" ? "אין חיבור לשרת. נסו שוב בעוד רגע." : "לא מצאתי סרטונים לחיפוש הזה. נסו מילים אחרות, או באנגלית.", true);
     return;
   }
   const c = getCollect(); let ok = 0;
