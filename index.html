@@ -192,6 +192,8 @@ h1,h2,h3,.sec,.tabs button,.catbar button{font-family:var(--f-display);font-weig
 .brand h1{font-family:var(--f-display);font-weight:400;font-size:22px;letter-spacing:.2px}
 .brand h1::before{display:none}
 .hdr{display:flex;align-items:center;gap:10px}
+.toolbtn{position:relative;width:42px;height:42px;padding:0;border-radius:50%;border:0;background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}.toolbtn svg{width:20px;height:20px}
+.toolbtn .badge{position:absolute;top:-2px;inset-inline-end:-2px;min-width:12px;height:16px;border-radius:99px;background:var(--pin);color:#fff;font-size:10.5px;line-height:16px;padding:0 3px;border:2px solid var(--paper);box-sizing:content-box}.toolbtn .badge[hidden]{display:none}
 .addbtn{width:42px;height:42px;padding:0;border-radius:50%;border:0;background:var(--ink);color:var(--paper);font-size:26px;line-height:1;box-shadow:var(--shadow);transition:transform .2s ease}
 .addbtn span{display:block;margin-top:-2px}
 .addbtn.on{transform:rotate(45deg)}
@@ -245,8 +247,9 @@ button.primary{background:var(--ink);color:var(--paper);border-radius:14px}
 .bar i{background:var(--pin)}
 /* Pinny talks: messages appear as a small speech bubble next to his face */
 .hello .hi{margin:0;font-family:var(--f-display);color:var(--pin);font-size:18px}
-.status:not(:empty),#geoNote:not([hidden]){position:relative;display:block;margin-inline-start:40px;background:var(--surface);color:var(--ink);border-radius:18px;border-end-start-radius:6px;padding:10px 14px;box-shadow:var(--shadow);font-size:14.5px;min-height:0}
+.status:not(:empty),#geoNote:not([hidden]){position:relative;display:block;margin-inline-start:0;background:var(--surface);color:var(--ink);border-radius:18px;padding:10px 14px;box-shadow:var(--shadow);font-size:14.5px;min-height:0}
 .status:not(:empty)::after,#geoNote:not([hidden])::after{content:"";position:absolute;inset-inline-start:-38px;bottom:0;width:28px;height:35px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 80'%3E%3Cpath d='M32 4C18 4 7 15 7 29c0 19 25 45 25 45s25-26 25-45C57 15 46 4 32 4z' fill='%23FF8FA3'/%3E%3Cellipse cx='18.5' cy='35' rx='4.5' ry='2.6' fill='%23FFC9D4'/%3E%3Cellipse cx='45.5' cy='35' rx='4.5' ry='2.6' fill='%23FFC9D4'/%3E%3Ccircle cx='24' cy='28' r='3.4' fill='%233B3654'/%3E%3Ccircle cx='40' cy='28' r='3.4' fill='%233B3654'/%3E%3Cpath d='M26.5 36.5q5.5 4.6 11 0' stroke='%233B3654' stroke-width='2.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat}
+.status:not(:empty)::after,#geoNote:not([hidden])::after{display:none}
 #geoNote:not([hidden])::before{display:none}
 .status.err:not(:empty){background:var(--sel);color:var(--ink)}
 /* ---- gentle style, part 2: empty states, folders, route, header ---- */
@@ -345,11 +348,17 @@ body.infolders #resetBox{order:3}
 .scancard{display:none;flex-direction:column;align-items:center;text-align:center;gap:12px;padding:30px 12px 18px}
 body.busy .scancard{display:flex}
 body.busy .hello,body.busy #status,body.busy #geoNote,body.busy #homeChat{display:none!important}
-body.collecting .hello{display:none}.homesearch{margin:14px 0 0}.homesearch .chatadd{margin:0;background:var(--surface);box-shadow:var(--shadow);border-style:solid;border-color:transparent}.homesearch .chatbox{margin:0}
+.homesearch{margin:12px 0 0}.homesearch:empty,.homechat:empty{display:none}
 .sico{flex:0 0 34px;height:34px;border-radius:12px;display:grid;place-items:center;background:var(--mint);color:var(--mint-ink)}.sico svg{width:20px;height:20px}
 .collect{background:var(--surface);border-radius:22px;padding:16px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:12px;border:1.5px solid var(--pin)}
 .collect .row{flex-wrap:wrap}.collect .btn.tt,.collect .btn.ig{flex:1 1 130px}
 .dots{display:flex;gap:6px}.dots .pd{flex:1;height:6px;border-radius:99px;background:var(--soft)}.dots .pd.need{background:var(--sel);box-shadow:inset 0 0 0 1.5px var(--blush)}.dots .pd.on{background:var(--pin)}
+.collectbar{display:flex;align-items:center;gap:8px;background:var(--surface);border-radius:18px;padding:8px 8px 8px 10px;box-shadow:var(--shadow);border:1.5px solid var(--pin)}
+.cb-main{flex:1;min-width:0;display:flex;align-items:center;gap:10px;border:0;background:none;padding:2px;text-align:right;white-space:normal;justify-content:flex-start;box-shadow:none}
+.cb-main>span:last-child{display:flex;flex-direction:column;min-width:0}.cb-main b{font-weight:600;font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cb-main .sub{font-size:12.5px}
+.cb-x{flex:0 0 34px;height:34px;padding:0;border-radius:50%;border:0;background:var(--soft);color:var(--muted);font-size:18px}
+.sheet .dots{margin:2px 0}.sheet .row{flex-wrap:wrap}.sheet .btn.tt,.sheet .btn.ig{flex:1 1 130px}.toolform{display:flex;flex-direction:column;gap:12px}
+.sheet .chatin{width:100%;box-sizing:border-box;font:inherit;font-size:14.5px;border:0;background:var(--soft);border-radius:14px;padding:12px;color:var(--ink);resize:vertical}
 .chips{display:flex;flex-wrap:wrap;gap:6px}.chip{border-radius:99px;padding:5px 12px;font-size:13.5px;background:var(--soft);border-color:transparent}
 .tiny{font-size:12.5px;margin:0}
 .homechat{margin:14px 0 4px}.homechat .chatadd{margin:0;background:var(--surface);box-shadow:var(--shadow);border-style:solid;border-color:transparent}.homechat .chatbox{margin:0}
@@ -417,7 +426,7 @@ body.collecting .hello{display:none}.homesearch{margin:14px 0 0}.homesearch .cha
 <body>
 <main class="app">
   <header class="brand"><div class="logo"><svg class="pal" viewBox="0 0 64 80" aria-hidden="true"><path d="M32 4C18 4 7 15 7 29c0 19 25 45 25 45s25-26 25-45C57 15 46 4 32 4z" fill="var(--pin)"/><ellipse cx="18.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><ellipse cx="45.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><circle cx="24" cy="28" r="3.4" fill="var(--face)"/><circle cx="40" cy="28" r="3.4" fill="var(--face)"/><circle cx="25.3" cy="26.8" r="1.1" fill="#fff"/><circle cx="41.3" cy="26.8" r="1.1" fill="#fff"/><path d="M26.5 36.5q5.5 4.6 11 0" stroke="var(--face)" stroke-width="2.6" fill="none" stroke-linecap="round"/></svg><h1 dir="ltr">FeedTrip</h1></div>
-    <div class="hdr"><span class="count" id="ver">v1.30</span><button class="addbtn" id="addBtn" type="button" aria-expanded="false" aria-controls="addBox" aria-label="הוספת קישור לסרטון"><span aria-hidden="true">+</span></button></div></header>
+    <div class="hdr"><span class="count" id="ver">v1.31</span><button class="toolbtn" id="toolSearch" type="button" aria-label="חיפוש המלצות בטיקטוק ובאינסטגרם"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg><span class="badge" hidden></span></button><button class="toolbtn" id="toolChat" type="button" aria-label="מסלול מצ'ט"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4V5Z"/><path d="M8 9.5h8M8 12.5h5"/></svg></button><button class="addbtn" id="addBtn" type="button" aria-expanded="false" aria-controls="addBox" aria-label="הוספת קישור לסרטון"><span aria-hidden="true">+</span></button></div></header>
 
 
   <div class="addbox" id="addBox" hidden>
@@ -435,6 +444,7 @@ body.collecting .hello{display:none}.homesearch{margin:14px 0 0}.homesearch .cha
     <button class="primary" type="submit">שמור</button>
   </form>
 
+  <section class="homesearch" id="homeSearch" aria-label="חיפוש המלצות"></section>
   <section class="hello" id="hello">
     <div class="hello-pal"><svg class="pal" viewBox="0 0 64 80" aria-hidden="true"><path d="M32 4C18 4 7 15 7 29c0 19 25 45 25 45s25-26 25-45C57 15 46 4 32 4z" fill="var(--pin)"/><ellipse cx="18.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><ellipse cx="45.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><circle cx="24" cy="28" r="3.4" fill="var(--face)"/><circle cx="40" cy="28" r="3.4" fill="var(--face)"/><circle cx="25.3" cy="26.8" r="1.1" fill="#fff"/><circle cx="41.3" cy="26.8" r="1.1" fill="#fff"/><path d="M26.5 36.5q5.5 4.6 11 0" stroke="var(--face)" stroke-width="2.6" fill="none" stroke-linecap="round"/></svg></div>
     <p class="hi">היי, אני פיני 👋</p>
@@ -454,7 +464,6 @@ body.collecting .hello{display:none}.homesearch{margin:14px 0 0}.homesearch .cha
     <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
   </section>
   <section class="feedbar" id="feedBar" hidden aria-label="הפיד שלי"></section>
-  <section class="homesearch" id="homeSearch" aria-label="חיפוש המלצות"></section>
   <section class="homechat" id="homeChat" aria-label="מסלול מצ'ט"></section>
   <p class="status" id="geoNote" hidden></p>
   <section class="card" id="card" hidden>
@@ -588,7 +597,7 @@ function loadFeed(){
 }
 const vidKey = v => (v.source?.url || v.title || "").replace(/\?.*$/, "");
 const saveFeed = () => store.set("ftm_feed", state.feed);
-let state = { feed: [], res: null, tab: "list", sel: null, folders: loadFolders(), folder: null, days: {}, pick: null, routeSrc: {}, chatEdit: null, chatPick: null, homeChat: false };
+let state = { feed: [], res: null, tab: "list", sel: null, folders: loadFolders(), folder: null, days: {}, pick: null, routeSrc: {}, chatEdit: null, chatPick: null, tool: null };
 state.feed = loadFeed(); state.res = state.feed[0] || null;
 const saveFolders = () => store.set("ftm_folders", state.folders);
 
@@ -671,6 +680,7 @@ document.addEventListener("submit", e => {
 });
 function renderSheet(){
   if (state.chatPick) return renderChatSheet();
+  if (state.tool) return renderToolSheet();
   const el = $("#sheet");
   if (!state.pick) { el.hidden = true; el.innerHTML = ""; return; }
   const sug = suggestFolder(state.res);
@@ -1002,12 +1012,12 @@ function chatBoxHTML(ctx, places, city){
   const plan = chatPlan(ctx);
   if (state.chatEdit === ctx) {
     const prompt = chatPrompt(places, city, Math.max(1, defaultDays(places)));
-    return `<div class="chatbox"><div class="chathead">${pinny("happy", "chat-pal")}<div><b>מסלול מצ'ט</b><p class="sub">1. שלחו לצ'ט את הבקשה, עם המקומות מהסרטונים. 2. העתיקו את התשובה והדביקו כאן.</p></div></div>
+    return `<div class="chatbox"><div class="chathead"><span class="sico">${ICON_CHAT}</span><div><b>מסלול מצ'ט</b><p class="sub">1. שלחו לצ'ט את הבקשה, עם המקומות מהסרטונים. 2. העתיקו את התשובה והדביקו כאן.</p></div></div>
       <div class="row"><a class="btn small" target="_blank" rel="noopener" href="https://chatgpt.com/?q=${encodeURIComponent(prompt)}">פתיחה ב-ChatGPT</a><a class="btn small" target="_blank" rel="noopener" href="https://claude.ai/new?q=${encodeURIComponent(prompt)}">פתיחה ב-Claude</a><button class="small" type="button" data-chatcopy="${esc(encodeURIComponent(prompt))}">העתקת הבקשה</button></div>
       <textarea id="chatIn" rows="8" placeholder="הדביקו כאן את המסלול מהצ'ט. למשל:&#10;יום 1: העיר העתיקה&#10;09:00 - Colosseum - כרטיס מראש&#10;13:00 - Roscioli - צהריים">${esc(plan?.text || "")}</textarea>
       <div class="row"><button class="primary-link" type="button" data-chatsave="${ctx}">בניית המסלול</button><button class="small ghost" type="button" data-chatcancel>ביטול</button></div></div>`;
   }
-  if (!plan) return `<button class="chatadd" data-chatedit="${ctx}">${pinny("wink", "chat-pal")}<span><b>יש לכם מסלול מצ'ט?</b><span class="sub">בנו מסלול ב-ChatGPT או Claude עם המקומות מהסרטונים, והדביקו כאן</span></span><span class="plus">+</span></button>`;
+  if (!plan) return `<button class="chatadd" data-chatedit="${ctx}"><span class="sico">${ICON_CHAT}</span><span><b>יש לכם מסלול מצ'ט?</b><span class="sub">בנו מסלול ב-ChatGPT או Claude עם המקומות מהסרטונים, והדביקו כאן</span></span><span class="plus">+</span></button>`;
   const src = state.routeSrc[ctx] || "chat";
   return `<div class="seg" role="group" aria-label="מקור המסלול"><button data-routesrc="${ctx}|chat" aria-pressed="${src === "chat"}">💬 מצ'ט + סרטונים</button><button data-routesrc="${ctx}|auto" aria-pressed="${src !== "chat"}">🎬 רק מהסרטונים</button></div>`;
 }
@@ -1678,7 +1688,7 @@ function startCollect(q){
   let f = state.folders.find(x => x.name === name);
   if (!f) { f = { id: "f" + Date.now().toString(36), name, places: [] }; state.folders.push(f); saveFolders(); }
   setCollect({ id: f.id, q, city, videos: [], at: Date.now() });
-  state.searchOpen = false; renderHomeSearch();
+  state.tool = "search"; renderSheet(); renderHomeSearch();
 }
 // Every video scanned while collecting joins the trip's folder (and keeps joining as more of its places are found).
 function collectInto(v){
@@ -1689,42 +1699,53 @@ function collectInto(v){
   if (added) saveFolders();
   if (vk && !c.videos.includes(vk)) { c.videos.push(vk); c.at = Date.now(); setCollect(c);
     setStatus(`הסרטון נוסף לטיול "${f.name}" (${c.videos.length} מתוך 2–5). ${c.videos.length < 2 ? "שתפו עוד סרטון אחד לפחות." : "אפשר לשתף עוד, או לבנות מסלול."}`); }
-  renderHomeSearch();
+  renderHomeSearch(); if (state.tool === "search") renderSheet();
 }
+const ICON_SEARCH = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>`;
+const ICON_CHAT = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4V5Z"/><path d="M8 9.5h8M8 12.5h5"/></svg>`;
+// While collecting: one slim line under the header. Everything else lives behind the two icons in the header.
 function renderHomeSearch(){
   const el = $("#homeSearch"); if (!el) return;
+  const c = getCollect(), badge = $("#toolSearch .badge");
+  if (badge) { badge.hidden = !c; badge.textContent = c ? c.videos.length : ""; }
+  if (!c) { el.innerHTML = ""; return; }
+  const n = c.videos.length;
+  el.innerHTML = `<div class="collectbar"><button type="button" class="cb-main" id="collectOpen"><span class="sico">${ICON_SEARCH}</span><span><b>אוספים: ${esc(c.q)}</b><span class="sub">${n ? `${n} ${n === 1 ? "סרטון" : "סרטונים"} מתוך 2–5` : "שתפו לכאן 2–5 סרטונים"}</span></span></button>
+    ${n ? `<button type="button" class="small primary-link" id="collectDone">מסלול</button>` : ""}<button type="button" class="cb-x" id="collectStop" aria-label="הפסקת האיסוף">×</button></div>`;
+}
+function searchSheetHTML(){
   const c = getCollect();
-  document.body.classList.toggle("collecting", !!c);
-  if (!c && (state.tab === "route" || (state.tab === "folders" && state.folder))) { el.innerHTML = ""; return; }
   if (c) {
     const f = state.folders.find(x => x.id === c.id), n = c.videos.length;
-    el.innerHTML = `<div class="collect"><div class="chathead">${pinny(n ? "happy" : "wink", "chat-pal")}<div><b>אוספים המלצות: ${esc(c.q)}</b>
-      <p class="sub">${n ? `${n} ${n === 1 ? "סרטון" : "סרטונים"} · ${f.places.length} מקומות בטיול "${esc(f.name)}"` : "חפשו, ושתפו ל-FeedTrip 2–5 סרטונים שאהבתם. כולם ייכנסו לאותו טיול."}</p></div></div>
+    return `<h3 id="toolT">אוספים המלצות: ${esc(c.q)}</h3>
+      <p class="sub" style="margin:0">${n ? `${n} ${n === 1 ? "סרטון" : "סרטונים"} · ${f.places.length} מקומות בטיול "${esc(f.name)}".` : `כל סרטון שתשתפו ל-FeedTrip ייכנס לטיול "${esc(f.name)}".`}</p>
       <div class="dots" aria-label="${n} מתוך 5">${[0,1,2,3,4].map(i => `<span class="pd${i < n ? " on" : i < 2 ? " need" : ""}"></span>`).join("")}</div>
-      <div class="row"><a class="btn small tt" target="_blank" rel="noopener" href="${tiktokSearch(c.q)}">חיפוש בטיקטוק</a><a class="btn small ig" target="_blank" rel="noopener" href="${instaSearch(c.q)}">חיפוש באינסטגרם</a></div>
-      <div class="row">${n ? `<button class="primary-link" type="button" id="collectDone">${n < 2 ? "לבנות כבר עכשיו" : "בניית המסלול"}</button>` : ""}<button class="small ghost" type="button" id="collectStop">${n ? "סיום בלי מסלול" : "ביטול"}</button></div>
-      <p class="sub tiny">באייפון: בסרטון לוחצים שיתוף ← העתקת קישור, וחוזרים לכאן ל-+ ← הדבק.</p></div>`;
-    return;
+      <div class="row"><a class="btn tt" target="_blank" rel="noopener" href="${tiktokSearch(c.q)}">חיפוש בטיקטוק</a><a class="btn ig" target="_blank" rel="noopener" href="${instaSearch(c.q)}">חיפוש באינסטגרם</a></div>
+      <p class="sub tiny">בסרטון שאהבתם: שיתוף ← FeedTrip. באייפון: העתקת קישור, וחוזרים לכאן ל-+ ← הדבק.</p>
+      <div class="row">${n ? `<button class="primary-link" type="button" id="collectDone">${n < 2 ? "לבנות כבר עכשיו" : "בניית המסלול"}</button>` : ""}<button class="small ghost" type="button" id="collectStop">${n ? "סיום בלי מסלול" : "ביטול החיפוש"}</button><button class="small" id="sheetClose" type="button">סגירה</button></div>`;
   }
-  if (!state.searchOpen) { el.innerHTML = `<button class="chatadd" id="searchOpen" type="button"><span class="sico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg></span><span><b>מחפשים המלצות?</b><span class="sub">כתבו יעד ונושא, ואחפש בטיקטוק ובאינסטגרם</span></span><span class="plus">+</span></button>`; return; }
-  el.innerHTML = `<form class="chatbox" id="searchForm"><div class="chathead">${pinny("happy", "chat-pal")}<div><b>מה מחפשים?</b><p class="sub">יעד ונושא, כמו בחיפוש של טיקטוק. אפתח את החיפוש בשתי האפליקציות, ואת הסרטונים שתשתפו אסדר לטיול אחד.</p></div></div>
+  return `<form id="searchForm" class="toolform"><h3 id="toolT">מחפשים המלצות?</h3>
+    <p class="sub" style="margin:0">כתבו יעד ונושא, כמו בחיפוש של טיקטוק. אפתח את החיפוש בטיקטוק ובאינסטגרם, ואת הסרטונים שתשתפו אסדר לטיול אחד.</p>
     <div class="scan"><input id="searchIn" placeholder="למשל: rome street food" autocomplete="off" enterkeyhint="search" style="direction:auto;text-align:right;font-family:var(--f-body)"><button class="primary" type="submit">יאללה</button></div>
     <div class="chips">${COLLECT_TOPICS.map(([he, en]) => `<button type="button" class="chip" data-topic="${esc(en)}">${esc(he)}</button>`).join("")}</div>
-    <p class="sub tiny" id="searchHint">💡 באנגלית יוצאים יותר סרטונים של מקומיים ותיירים. בעברית יוצאים בעיקר סרטונים של ישראלים.</p>
-    <div class="row"><button class="small ghost" type="button" id="searchClose">ביטול</button></div></form>`;
+    <p class="sub tiny">💡 באנגלית יוצאים יותר סרטונים של מקומיים ותיירים.</p>
+    <button class="small" id="sheetClose" type="button" style="align-self:flex-start">ביטול</button></form>`;
 }
-document.addEventListener("submit", e => { if (e.target.id !== "searchForm") return; e.preventDefault(); startCollect($("#searchIn").value); });
-function renderHomeChat(){
-  const el = $("#homeChat"); if (!el) return;
-  // on a route screen the same button is already inside the route
-  if (state.tab === "route" || (state.tab === "folders" && state.folder && state.folderTab === "route")) { el.innerHTML = ""; return; }
-  if (!state.homeChat) { el.innerHTML = `<button class="chatadd" id="homeChatOpen" type="button">${pinny("wink", "chat-pal")}<span><b>יש לכם מסלול מצ'ט?</b><span class="sub">הדביקו מסלול מ-ChatGPT או Claude, ואשלב בו את הסרטונים</span></span><span class="plus">+</span></button>`; return; }
+function chatSheetHTML(){
   const r = state.res, prompt = r ? chatPrompt(r.places, r.city, Math.max(1, defaultDays(r.places))) : chatPrompt([], "", 3).replace("ב" + "היעד", "ב___").replace("ל־3 ימים", "ל־___ ימים");
-  el.innerHTML = `<div class="chatbox"><div class="chathead">${pinny("happy", "chat-pal")}<div><b>מסלול מצ'ט</b><p class="sub">${r ? `הבקשה כוללת את המקומות מ"${esc(cleanTitle(r.title))}".` : "השלימו בבקשה את היעד ומספר הימים."} את התשובה מהצ'ט הדביקו כאן, ואשאל לאיזה טיול לצרף אותה.</p></div></div>
+  return `<h3 id="toolT">מסלול מצ'ט</h3>
+    <p class="sub" style="margin:0">${r ? `הבקשה כוללת את המקומות מ"${esc(cleanTitle(r.title))}". ` : "השלימו בבקשה את היעד ומספר הימים. "}את התשובה מהצ'ט הדביקו כאן, ואשאל לאיזה טיול לצרף אותה.</p>
     <div class="row"><a class="btn small" target="_blank" rel="noopener" href="https://chatgpt.com/?q=${encodeURIComponent(prompt)}">פתיחה ב-ChatGPT</a><a class="btn small" target="_blank" rel="noopener" href="https://claude.ai/new?q=${encodeURIComponent(prompt)}">פתיחה ב-Claude</a><button class="small" type="button" data-chatcopy="${esc(encodeURIComponent(prompt))}">העתקת הבקשה</button></div>
-    <textarea id="homeChatIn" rows="7" placeholder="הדביקו כאן את המסלול מהצ'ט. למשל:&#10;יום 1: העיר העתיקה&#10;09:00 - Colosseum&#10;13:00 - Roscioli - צהריים"></textarea>
-    <div class="row"><button class="primary-link" type="button" id="homeChatGo">המשך</button><button class="small ghost" type="button" id="homeChatClose">ביטול</button></div></div>`;
+    <textarea id="homeChatIn" class="chatin" rows="7" placeholder="הדביקו כאן את המסלול מהצ'ט. למשל:&#10;יום 1: העיר העתיקה&#10;09:00 - Colosseum&#10;13:00 - Roscioli - צהריים"></textarea>
+    <div class="row"><button class="primary-link" type="button" id="homeChatGo">המשך</button><button class="small ghost" id="sheetClose" type="button">ביטול</button></div>`;
 }
+function renderToolSheet(){
+  const el = $("#sheet"); el.hidden = false;
+  el.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="toolT"><span class="grab" aria-hidden="true"></span>${state.tool === "chat" ? chatSheetHTML() : searchSheetHTML()}</div>`;
+}
+$("#sheet").addEventListener("click", e => { if (e.target.id === "sheet") { state.pick = null; state.chatPick = null; state.tool = null; renderSheet(); } });
+document.addEventListener("submit", e => { if (e.target.id !== "searchForm") return; e.preventDefault(); startCollect($("#searchIn").value); });
+function renderHomeChat(){ const el = $("#homeChat"); if (el) el.innerHTML = ""; }
 function render(){
   renderHomeChat(); renderHomeSearch();
   document.body.classList.toggle("has-feed", state.feed.length > 0);
@@ -1802,19 +1823,17 @@ function renderTabs(r){
 }
 
 document.addEventListener("click", e => {
-  const t = e.target.closest("#searchOpen,#searchClose,#collectDone,#collectStop,[data-topic],#homeChatOpen,#homeChatClose,#homeChatGo,[data-chatedit],[data-chatsave],[data-chatcancel],[data-chatdel],[data-chatcopy],[data-routesrc],[data-chattrip],[data-ftab],[data-routefocus],[data-routemode],[data-showmap],[data-mymaps],[data-catf],[data-ocr],[data-tab],[data-save],[data-remove],[data-del],[data-folder],[data-pick],[data-days],[data-share],.place,#addAll,[data-video],[data-delvideo],#showAll,#backFolders,#delFolderAsk,#delFolderYes,#delFolderNo,#sheetClose,#sheet");
+  const t = e.target.closest("#toolSearch,#toolChat,#collectOpen,#collectDone,#collectStop,[data-topic],#homeChatOpen,#homeChatClose,#homeChatGo,[data-chatedit],[data-chatsave],[data-chatcancel],[data-chatdel],[data-chatcopy],[data-routesrc],[data-chattrip],[data-ftab],[data-routefocus],[data-routemode],[data-showmap],[data-mymaps],[data-catf],[data-ocr],[data-tab],[data-save],[data-remove],[data-del],[data-folder],[data-pick],[data-days],[data-share],.place,#addAll,[data-video],[data-delvideo],#showAll,#backFolders,#delFolderAsk,#delFolderYes,#delFolderNo,#sheetClose,#sheet");
   if (!t) return;
   if (t.id === "sheet") { if (e.target === t) { state.pick = null; state.chatPick = null; renderSheet(); } return; }
-  if (t.id === "sheetClose") { state.pick = null; state.chatPick = null; renderSheet(); return; }
-  if (t.id === "searchOpen") { state.searchOpen = true; renderHomeSearch(); setTimeout(() => $("#searchIn")?.focus(), 30); return; }
-  if (t.id === "searchClose") { state.searchOpen = false; renderHomeSearch(); return; }
+  if (t.id === "sheetClose") { state.pick = null; state.chatPick = null; state.tool = null; renderSheet(); return; }
+  if (t.id === "toolSearch" || t.id === "collectOpen") { state.tool = "search"; renderSheet(); setTimeout(() => $("#searchIn")?.focus(), 60); return; }
+  if (t.id === "toolChat") { state.tool = "chat"; renderSheet(); return; }
   if (t.matches("[data-topic]")) { const i = $("#searchIn"); const base = i.value.replace(new RegExp("\s*(" + COLLECT_TOPICS.map(x => x[1]).join("|") + ")$", "i"), "").trim(); i.value = (base ? base + " " : "") + t.dataset.topic; i.focus(); return; }
-  if (t.id === "collectStop") { setCollect(null); renderHomeSearch(); return; }
-  if (t.id === "collectDone") { const c = getCollect(); setCollect(null); state.tab = "folders"; state.folder = c.id; state.folderTab = "route"; render(); locateCurrent(); window.scrollTo?.({ top: 0, behavior: "smooth" }); return; }
-  if (t.id === "homeChatOpen") { state.homeChat = true; renderHomeChat(); setTimeout(() => $("#homeChatIn")?.focus(), 30); return; }
-  if (t.id === "homeChatClose") { state.homeChat = false; renderHomeChat(); return; }
+  if (t.id === "collectStop") { setCollect(null); state.tool = null; renderSheet(); renderHomeSearch(); return; }
+  if (t.id === "collectDone") { const c = getCollect(); setCollect(null); state.tool = null; renderSheet(); state.tab = "folders"; state.folder = c.id; state.folderTab = "route"; render(); locateCurrent(); window.scrollTo?.({ top: 0, behavior: "smooth" }); return; }
   if (t.id === "homeChatGo") { const txt = $("#homeChatIn").value; if (!parseChatRoute(txt).length) { setStatus("לא מצאתי בטקסט ימים ועצירות. כל עצירה צריכה להיות בשורה נפרדת, ואפשר לפתוח כל יום ב\"יום 1:\".", true); return; }
-    state.homeChat = false; state.pick = null; state.chatPick = txt; renderSheet(); renderHomeChat(); return; }
+    state.tool = null; state.pick = null; state.chatPick = txt; renderSheet(); return; }
   if (t.matches("[data-chatedit]")) { state.chatEdit = t.dataset.chatedit; render(); setTimeout(() => $("#chatIn")?.focus(), 30); return; }
   if (t.matches("[data-chatcancel]")) { state.chatEdit = null; render(); return; }
   if (t.matches("[data-chatcopy]")) { const txt = decodeURIComponent(t.dataset.chatcopy); (navigator.clipboard?.writeText(txt) || Promise.reject()).then(() => setStatus("הבקשה הועתקה. הדביקו אותה בצ'ט, ואת התשובה הדביקו כאן."), () => setStatus("לא הצלחתי להעתיק. אפשר ללחוץ על \"פתיחה ב-ChatGPT\".", true)); return; }
