@@ -426,7 +426,7 @@ body.busy .hello,body.busy #status,body.busy #geoNote,body.busy #homeChat{displa
 <body>
 <main class="app">
   <header class="brand"><div class="logo"><svg class="pal" viewBox="0 0 64 80" aria-hidden="true"><path d="M32 4C18 4 7 15 7 29c0 19 25 45 25 45s25-26 25-45C57 15 46 4 32 4z" fill="var(--pin)"/><ellipse cx="18.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><ellipse cx="45.5" cy="35" rx="4.5" ry="2.6" fill="var(--blush)"/><circle cx="24" cy="28" r="3.4" fill="var(--face)"/><circle cx="40" cy="28" r="3.4" fill="var(--face)"/><circle cx="25.3" cy="26.8" r="1.1" fill="#fff"/><circle cx="41.3" cy="26.8" r="1.1" fill="#fff"/><path d="M26.5 36.5q5.5 4.6 11 0" stroke="var(--face)" stroke-width="2.6" fill="none" stroke-linecap="round"/></svg><h1 dir="ltr">FeedTrip</h1></div>
-    <div class="hdr"><span class="count" id="ver">v1.31</span><button class="toolbtn" id="toolSearch" type="button" aria-label="חיפוש המלצות בטיקטוק ובאינסטגרם"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg><span class="badge" hidden></span></button><button class="toolbtn" id="toolChat" type="button" aria-label="מסלול מצ'ט"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4V5Z"/><path d="M8 9.5h8M8 12.5h5"/></svg></button><button class="addbtn" id="addBtn" type="button" aria-expanded="false" aria-controls="addBox" aria-label="הוספת קישור לסרטון"><span aria-hidden="true">+</span></button></div></header>
+    <div class="hdr"><span class="count" id="ver">v1.32</span><button class="toolbtn" id="toolSearch" type="button" aria-label="חיפוש המלצות בטיקטוק ובאינסטגרם"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg><span class="badge" hidden></span></button><button class="toolbtn" id="toolChat" type="button" aria-label="מסלול מצ'ט"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H9l-5 4V5Z"/><path d="M8 9.5h8M8 12.5h5"/></svg></button><button class="addbtn" id="addBtn" type="button" aria-expanded="false" aria-controls="addBox" aria-label="הוספת קישור לסרטון"><span aria-hidden="true">+</span></button></div></header>
 
 
   <div class="addbox" id="addBox" hidden>
@@ -1725,7 +1725,7 @@ function searchSheetHTML(){
       <div class="row">${n ? `<button class="primary-link" type="button" id="collectDone">${n < 2 ? "לבנות כבר עכשיו" : "בניית המסלול"}</button>` : ""}<button class="small ghost" type="button" id="collectStop">${n ? "סיום בלי מסלול" : "ביטול החיפוש"}</button><button class="small" id="sheetClose" type="button">סגירה</button></div>`;
   }
   return `<form id="searchForm" class="toolform"><h3 id="toolT">מחפשים המלצות?</h3>
-    <p class="sub" style="margin:0">כתבו יעד ונושא, כמו בחיפוש של טיקטוק. אפתח את החיפוש בטיקטוק ובאינסטגרם, ואת הסרטונים שתשתפו אסדר לטיול אחד.</p>
+    <p class="sub" style="margin:0">כתבו יעד ונושא, כמו בחיפוש של טיקטוק. אמצא את הסרטונים הכי נצפים בטיקטוק ובאינסטגרם, אסרוק אותם ואבנה מהם טיול ומסלול.</p>
     <div class="scan"><input id="searchIn" placeholder="למשל: rome street food" autocomplete="off" enterkeyhint="search" style="direction:auto;text-align:right;font-family:var(--f-body)"><button class="primary" type="submit">יאללה</button></div>
     <div class="chips">${COLLECT_TOPICS.map(([he, en]) => `<button type="button" class="chip" data-topic="${esc(en)}">${esc(he)}</button>`).join("")}</div>
     <p class="sub tiny">💡 באנגלית יוצאים יותר סרטונים של מקומיים ותיירים.</p>
@@ -1744,7 +1744,42 @@ function renderToolSheet(){
   el.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-labelledby="toolT"><span class="grab" aria-hidden="true"></span>${state.tool === "chat" ? chatSheetHTML() : searchSheetHTML()}</div>`;
 }
 $("#sheet").addEventListener("click", e => { if (e.target.id === "sheet") { state.pick = null; state.chatPick = null; state.tool = null; renderSheet(); } });
-document.addEventListener("submit", e => { if (e.target.id !== "searchForm") return; e.preventDefault(); startCollect($("#searchIn").value); });
+document.addEventListener("submit", e => { if (e.target.id !== "searchForm") return; e.preventDefault(); autoSearch($("#searchIn").value); });
+// The server finds the most watched videos about the search (TikTok + Instagram, via Apify), then each one is
+// scanned like a shared video and lands in the same trip. Without the Apify key: search in the apps by hand.
+const SEARCH_API = API.replace(/\/scan$/, "/search");
+async function autoSearch(q){
+  q = q.trim().replace(/\s+/g, " "); if (q.length < 2) return;
+  startCollect(q);
+  state.tool = null; renderSheet();
+  document.body.classList.add("busy"); $("#bar").hidden = false;
+  setStatus(`מחפש בטיקטוק ובאינסטגרם: "${q}"… (עד דקה)`);
+  let j = {};
+  try {
+    const r = await fetch(SEARCH_API, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${ANON}`, apikey: ANON }, body: JSON.stringify({ q, n: 5, pin: store.get("ftm_pin", "") }) });
+    j = await r.json().catch(() => ({}));
+  } catch { j = { error: "offline" }; }
+  document.body.classList.remove("busy"); $("#bar").hidden = true;
+  if (!j.results?.length) {
+    state.tool = "search"; renderSheet();
+    setStatus(j.error === "needs_apify" ? "החיפוש האוטומטי עוד לא מחובר (חסר מפתח Apify בשרת). בינתיים: חפשו בכפתורים, ושתפו לכאן את הסרטונים שאהבתם."
+      : j.error === "offline" ? "אין חיבור לשרת. אפשר לחפש בכפתורים ולשתף סרטונים לכאן." : "לא מצאתי סרטונים לחיפוש הזה. נסו מילים אחרות, או באנגלית.", true);
+    return;
+  }
+  const c = getCollect(); let ok = 0;
+  for (const [i, h] of j.results.entries()) {
+    setStatus(`סורק סרטון ${i + 1} מתוך ${j.results.length}${h.author ? ` (${h.author})` : ""}…`);
+    const before = c ? (getCollect()?.videos.length || 0) : 0;
+    try { await scan(h.url); } catch {}
+    if ((getCollect()?.videos.length || 0) > before || state.res?.source?.url === h.url) ok++;
+  }
+  const f = state.folders.find(x => x.id === c?.id);
+  setCollect(null);
+  if (f && f.places.length) {
+    state.tab = "folders"; state.folder = f.id; state.folderTab = "route"; render(); locateCurrent();
+    setStatus(`סרקתי ${j.results.length} סרטונים ומצאתי ${f.places.length} מקומות בטיול "${f.name}". הנה המסלול.`);
+  } else { render(); setStatus("סרקתי את הסרטונים, אבל לא מצאתי בהם שמות של מקומות. נסו חיפוש אחר.", true); }
+}
 function renderHomeChat(){ const el = $("#homeChat"); if (el) el.innerHTML = ""; }
 function render(){
   renderHomeChat(); renderHomeSearch();
